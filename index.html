@@ -493,17 +493,26 @@ function showApp(){
   refreshFuelStart();
 }
 
-document.getElementById("loginBtn").addEventListener("click", ()=>{
+document.getElementById("loginBtn").addEventListener("click", async ()=>{
   const name = document.getElementById("loginCaptain").value;
   const pin = document.getElementById("loginPin").value.trim();
-  const bs = loadBootstrap();
-  const captains = (bs && bs.captains) || [];
-  const captain = captains.find(c=>c.name === name);
 
   if(!name){
     document.getElementById("loginHint").textContent = "Select your name.";
     return;
   }
+
+  // If bootstrap not cached yet, fetch it now before validating
+  let bs = loadBootstrap();
+  if(!bs || !bs.captains || !bs.captains.length){
+    document.getElementById("loginHint").textContent = "Loading captain list…";
+    await refreshBootstrap();
+    bs = loadBootstrap();
+  }
+
+  const captains = (bs && bs.captains) || [];
+  const captain = captains.find(c=>c.name === name);
+
   if(!captain){
     document.getElementById("loginHint").textContent = "Captain list not loaded yet. Connect to wifi/data once, then try again.";
     return;
