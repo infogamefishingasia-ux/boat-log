@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Aqua Creed - Admin Dashboard</title>
+<meta name="theme-color" content="#1F4E78">
+<style>
+  :root{
+    --navy:#1F4E78;
+    --navy-dark:#163a59;
+    --teal:#2a9d8f;
+    --bg:#f4f6f8;
+    --card:#ffffff;
+    --text:#1a1a1a;
+    --muted:#6b7280;
+    --warn:#e76f51;
+    --ok:#2a9d8f;
+    --border:#d8dee4;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+    background:var(--bg); color:var(--text); padding-bottom:40px;
+  }
+  header{
+    background:var(--navy); color:#fff; padding:16px; position:sticky; top:0; z-index:10;
+    display:flex; align-items:center; justify-content:space-between;
+  }
+  header h1{margin:0; font-size:18px; font-weight:700;}
+  header .sub{font-size:12px; opacity:.85; margin-top:2px;}
+  header a{color:#9be8de; font-size:12px; text-decoration:underline;}
+  header .title-group{display:flex; align-items:center; gap:10px;}
+  header .logo{width:40px; height:40px; flex-shrink:0;}
+  main{padding:12px; max-width:760px; margin:0 auto;}
+  .card{
+    background:var(--card); border:1px solid var(--border); border-radius:12px;
+    padding:14px; margin-bottom:12px;
+  }
+  .card h2{
+    font-size:14px; text-transform:uppercase; letter-spacing:.04em;
+    color:var(--navy); margin:0 0 12px; border-bottom:2px solid var(--bg); padding-bottom:8px;
+  }
+  label{display:block; font-size:13px; font-weight:600; margin:10px 0 4px; color:#333;}
+  label .opt{font-weight:400; color:var(--muted); font-size:11px;}
+  select, input, textarea{
+    width:100%; padding:11px 10px; font-size:16px; border:1px solid var(--border);
+    border-radius:8px; background:#fff; color:var(--text); font-family:inherit;
+  }
+  button{
+    padding:12px 16px; font-size:14px; font-weight:700; border:none;
+    border-radius:10px; cursor:pointer;
+  }
+  .btn-primary{background:var(--navy); color:#fff;}
+  .btn-secondary{background:#eef1f4; color:var(--navy);}
+  .btn-row{display:flex; gap:10px; flex-wrap:wrap; margin-top:10px;}
+  .btn-row button{flex:1; min-width:140px;}
+  .table-wrap{overflow-x:auto; -webkit-overflow-scrolling:touch;}
+  table{width:100%; min-width:540px; border-collapse:collapse; font-size:13px;}
+  th, td{padding:8px 6px; text-align:left; border-bottom:1px solid var(--bg); white-space:nowrap;}
+  th{color:var(--muted); font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:.03em;}
+  tfoot td{font-weight:700;}
+  .stat-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:10px; text-align:center;}
+  .stat-box{background:var(--bg); border-radius:10px; padding:12px 6px;}
+  .stat-box .num{font-size:22px; font-weight:800; color:var(--navy);}
+  .stat-box .lbl{font-size:11px; color:var(--muted); margin-top:2px;}
+  .config-row{display:grid; grid-template-columns:1.4fr 1fr 1fr auto; gap:8px; align-items:end; margin-bottom:10px;}
+  .config-row label{margin:0 0 4px;}
+  .captain-row, .admin-row{display:grid; grid-template-columns:1.6fr 1fr auto auto; gap:8px; align-items:end; margin-bottom:8px;}
+  .captain-row label, .admin-row label{margin:0 0 4px;}
+  .chk{display:flex; align-items:center; gap:6px; padding:11px 0;}
+  .chk input{width:auto;}
+  .hint{font-size:11px; color:var(--muted); margin-top:6px;}
+  .toast{
+    position:fixed; top:64px; left:50%; transform:translateX(-50%);
+    background:#1a1a1a; color:#fff; padding:10px 18px; border-radius:8px;
+    font-size:13px; z-index:50; opacity:0; transition:opacity .25s;
+    pointer-events:none; max-width:90%; text-align:center;
+  }
+  .toast.show{opacity:1;}
+
+  /* Login screen */
+  .login-screen{
+    position:fixed; inset:0; background:var(--navy); display:flex;
+    align-items:center; justify-content:center; padding:20px; z-index:100;
+  }
+  .login-screen.hidden{display:none;}
+  .login-card{
+    background:#fff; border-radius:14px; padding:24px; width:100%; max-width:360px;
+  }
+  .login-card h1{font-size:18px; color:var(--navy); margin:0 0 4px;}
+  .login-card p{font-size:13px; color:var(--muted); margin:0 0 14px;}
+  .login-card button{width:100%; margin-top:14px;}
+  .login-hint{font-size:12px; color:var(--warn); margin-top:8px; min-height:16px;}
+  #appScreen.hidden{display:none;}
+  .remove-btn{background:#fbdcd6; color:#a3341b; padding:11px 12px;}
+</style>
+</head>
+<body>
+
+<!-- ============================================================ -->
+<!-- Login screen                                                  -->
+<!-- ============================================================ -->
+<div class="login-screen" id="loginScreen">
+  <div class="login-card">
+    <h1>Aqua Creed - Admin Dashboard</h1>
+    <p>Enter the admin password to view fleet data and settings.</p>
+    <label for="loginPassword">Admin Password</label>
+    <input type="password" id="loginPassword">
+    <button type="button" class="btn-primary" id="loginBtn">Log In</button>
+    <div class="login-hint" id="loginHint"></div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- Dashboard                                                      -->
+<!-- ============================================================ -->
+<div id="appScreen" class="hidden">
+
+<header>
+  <div class="title-group">
+    <img src="logo.png" alt="GameFishingAsia.com - Predator Fishing" class="logo">
+    <div>
+      <h1>Aqua Creed - Admin Dashboard</h1>
+      <div class="sub">Fleet overview &amp; settings</div>
+    </div>
+  </div>
+  <a href="index.html">← Captain App</a>
+</header>
+
+<main>
+
+  <div class="hint" id="loggedInAs" style="margin:0 4px 10px;"></div>
+
+  <div class="card">
+    <h2>Fleet Overview</h2>
+    <div class="table-wrap">
+    <table id="fleetTable">
+      <thead>
+        <tr>
+          <th>Boat</th>
+          <th>Fuel Available (L)</th>
+          <th>Tank Capacity (L)</th>
+          <th>Avg Fuel / Voyage (L)</th>
+          <th>Port Eng Hrs</th>
+          <th>Stbd Eng Hrs</th>
+        </tr>
+      </thead>
+      <tbody id="fleetTableBody"></tbody>
+    </table>
+    </div>
+    <div class="hint" id="fleetLastUpdated"></div>
+  </div>
+
+  <div class="card">
+    <h2>Catch Totals (All Boats)</h2>
+    <div class="stat-grid">
+      <div class="stat-box">
+        <div class="num" id="totalGT">0</div>
+        <div class="lbl">Total GT Count</div>
+      </div>
+      <div class="stat-box">
+        <div class="num" id="totalGTOver30">0</div>
+        <div class="lbl">GT &gt; 30kg / 120cm</div>
+      </div>
+      <div class="stat-box">
+        <div class="num" id="totalDogtooth">0</div>
+        <div class="lbl">Total Dogtooth Count</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Export Data</h2>
+    <p class="hint">Download the full Voyage Log or Catches log as a CSV file (opens in Excel / Google Sheets).</p>
+    <div class="btn-row">
+      <button type="button" class="btn-secondary" id="csvVoyageBtn">Download Voyage Log CSV</button>
+      <button type="button" class="btn-secondary" id="csvCatchesBtn">Download Catches CSV</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Settings: Fuel Tanks</h2>
+    <p class="hint">Set each boat's tank capacity and current fuel balance. The balance updates automatically as captains log voyages - adjust it here if it drifts (e.g. an external refuel not logged through the app).</p>
+    <div id="configRows"></div>
+    <div class="btn-row">
+      <button type="button" class="btn-primary" id="saveConfigBtn">Save Fuel Tank Settings</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Settings: Captains &amp; PINs</h2>
+    <p class="hint">Set a 4-digit PIN for each captain so they can log in on the boat app. Untick "Active" to hide a captain from the login screen without deleting their history.</p>
+    <div class="hint" id="captainsLastEdited"></div>
+    <div id="captainRows"></div>
+    <div class="btn-row">
+      <button type="button" class="btn-secondary" id="addCaptainBtn">+ Add Captain</button>
+      <button type="button" class="btn-primary" id="saveCaptainsBtn">Save Captains</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Settings: Admin Logins</h2>
+    <p class="hint">Set a password for each person who should be able to open this dashboard (you + your managers). Untick "Active" to disable a login without deleting it. At least one active login with a password must always remain.</p>
+    <div class="hint" id="adminsLastEdited"></div>
+    <div id="adminRows"></div>
+    <div class="btn-row">
+      <button type="button" class="btn-secondary" id="addAdminBtn">+ Add Admin</button>
+      <button type="button" class="btn-primary" id="saveAdminsBtn">Save Admin Logins</button>
+    </div>
+  </div>
+
+  <div class="btn-row">
+    <button type="button" class="btn-secondary" id="refreshBtn">Refresh Data</button>
+    <button type="button" class="btn-secondary" id="logoutBtn">Log Out</button>
+  </div>
+
+</main>
+
+</div><!-- /#appScreen -->
+
+<div class="toast" id="toast"></div>
+
+<script>
+const CONFIG = {
+  // Must be the same Apps Script web app URL used in index.html
+  SYNC_URL: "https://script.google.com/a/macros/gamefishingasia.com/s/AKfycbxp7xJxtc_B6fkQBP54wEsy1cMU4Ug5O0q_9vNJhjZUS8JcjxLQt514aU9wZA3RqLRp/exec"
+};
+
+const PASSWORD_KEY = "boatlog_admin_pw_v1";
+
+// ============================================================
+// Toast helper
+// ============================================================
+let toastTimer;
+function showToast(msg){
+  const t = document.getElementById("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>t.classList.remove("show"), 3000);
+}
+
+// ============================================================
+// Login / session (password kept in sessionStorage only)
+// ============================================================
+function getPassword(){
+  return sessionStorage.getItem(PASSWORD_KEY) || "";
+}
+function setPassword(pw){
+  sessionStorage.setItem(PASSWORD_KEY, pw);
+}
+function clearPassword(){
+  sessionStorage.removeItem(PASSWORD_KEY);
+}
+
+function showLogin(){
+  document.getElementById("loginScreen").classList.remove("hidden");
+  document.getElementById("appScreen").classList.add("hidden");
+  document.getElementById("loginPassword").value = "";
+  document.getElementById("loginHint").textContent = "";
+}
+function showApp(){
+  document.getElementById("loginScreen").classList.add("hidden");
+  document.getElementById("appScreen").classList.remove("hidden");
+}
+
+document.getElementById("loginBtn").addEventListener("click", async ()=>{
+  const pw = document.getElementById("loginPassword").value;
+  if(!pw){
+    document.getElementById("loginHint").textContent = "Enter the admin password.";
+    return;
+  }
+  document.getElementById("loginHint").textContent = "Checking...";
+  const ok = await loadDashboard(pw);
+  if(ok){
+    setPassword(pw);
+    showApp();
+    await loadSettings();
+  }else{
+    document.getElementById("loginHint").textContent = "Incorrect password, or unable to reach the server. Check your connection.";
+  }
+});
+
+document.getElementById("logoutBtn").addEventListener("click", ()=>{
+  clearPassword();
+  showLogin();
+});
+
+// ============================================================
+// Dashboard data
+// ============================================================
+async function loadDashboard(pw){
+  if(CONFIG.SYNC_URL.indexOf("PASTE_YOUR") === 0){
+    showToast("Sync endpoint not configured yet.");
+    return false;
+  }
+  try{
+    const res = await fetch(CONFIG.SYNC_URL + "?action=dashboard&password=" + encodeURIComponent(pw));
+    const data = await res.json();
+    if(data.status !== "ok") return false;
+    renderDashboard(data.dashboard);
+    return true;
+  }catch(err){
+    return false;
+  }
+}
+
+function renderDashboard(dash){
+  const body = document.getElementById("fleetTableBody");
+  body.innerHTML = "";
+  (dash.boats || []).forEach(b=>{
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${b.boat}</td>
+      <td>${fmt(b.fuelAvailable)}</td>
+      <td>${fmt(b.tankCapacity)}</td>
+      <td>${fmt(b.avgFuelConsumption)}</td>
+      <td>${fmt(b.portEngineHours)}</td>
+      <td>${fmt(b.stbdEngineHours)}</td>
+    `;
+    body.appendChild(tr);
+  });
+
+  document.getElementById("totalGT").textContent = (dash.totals && dash.totals.gtCount) || 0;
+  document.getElementById("totalGTOver30").textContent = (dash.totals && dash.totals.gtOver30Count) || 0;
+  document.getElementById("totalDogtooth").textContent = (dash.totals && dash.totals.dogtoothCount) || 0;
+
+  document.getElementById("fleetLastUpdated").textContent = "Updated " + new Date().toLocaleString();
+
+  document.getElementById("loggedInAs").textContent = dash.loggedInAs ? ("Logged in as: " + dash.loggedInAs) : "";
+  currentAdmins = dash.admins || [];
+  renderAdminRows();
+}
+
+function fmt(n){
+  const x = Number(n) || 0;
+  return (Math.round(x * 10) / 10).toString();
+}
+
+// ============================================================
+// Settings: load via bootstrap (no extra password check needed,
+// bootstrap is the same data captains' apps already cache)
+// ============================================================
+let currentBoats = [];
+let currentCaptains = [];
+let currentAdmins = [];
+
+async function loadSettings(){
+  if(CONFIG.SYNC_URL.indexOf("PASTE_YOUR") === 0) return;
+  try{
+    const res = await fetch(CONFIG.SYNC_URL + "?action=bootstrap");
+    const data = await res.json();
+    if(data.status !== "ok") return;
+    currentBoats = data.boats || [];
+    currentCaptains = data.captains || [];
+    renderConfigRows();
+    renderCaptainRows();
+  }catch(err){
+    showToast("Could not load settings (offline?).");
+  }
+}
+
+function renderConfigRows(){
+  const wrap = document.getElementById("configRows");
+  wrap.innerHTML = "";
+  currentBoats.forEach((b, i)=>{
+    const row = document.createElement("div");
+    row.className = "config-row";
+    row.innerHTML = `
+      <div>
+        <label>Boat</label>
+        <input type="text" data-field="boat" data-idx="${i}" value="${escapeAttr(b.boat)}" readonly>
+      </div>
+      <div>
+        <label>Tank Capacity (L)</label>
+        <input type="number" step="1" data-field="tankCapacity" data-idx="${i}" value="${b.tankCapacity}">
+      </div>
+      <div>
+        <label>Current Balance (L)</label>
+        <input type="number" step="0.1" data-field="currentBalance" data-idx="${i}" value="${b.currentBalance}">
+      </div>
+      <div class="hint" style="padding-bottom:11px;">${b.lastEditedBy ? "Edited by " + escapeAttr(b.lastEditedBy) : ""}</div>
+    `;
+    wrap.appendChild(row);
+  });
+}
+
+function renderCaptainRows(){
+  const wrap = document.getElementById("captainRows");
+  wrap.innerHTML = "";
+  currentCaptains.forEach((c, i)=>{
+    addCaptainRow(c, i);
+  });
+  renderLastEdited("captainsLastEdited", currentCaptains);
+}
+
+// Full-replace lists (Captains, Admins) get the same "Last Edited By" stamp
+// on every row when saved, so show one summary line for the whole list.
+function renderLastEdited(elId, list){
+  const el = document.getElementById(elId);
+  if(!el) return;
+  const stampVal = (list.find(x => x.lastEditedBy) || {}).lastEditedBy;
+  el.textContent = stampVal ? ("List last saved by " + stampVal) : "";
+}
+
+function addCaptainRow(c, idx){
+  const wrap = document.getElementById("captainRows");
+  const row = document.createElement("div");
+  row.className = "captain-row";
+  const name = c ? c.name : "";
+  const pin = c ? c.pin : "";
+  const active = c ? c.active !== false : true;
+  row.innerHTML = `
+    <div>
+      <label>Name</label>
+      <input type="text" data-field="name" value="${escapeAttr(name)}" placeholder="Captain full name">
+    </div>
+    <div>
+      <label>PIN</label>
+      <input type="text" data-field="pin" inputmode="numeric" maxlength="4" pattern="[0-9]*" value="${escapeAttr(String(pin || ""))}" placeholder="4-digit">
+    </div>
+    <div class="chk">
+      <input type="checkbox" data-field="active" ${active ? "checked" : ""}>
+      <label style="margin:0;">Active</label>
+    </div>
+    <div>
+      <button type="button" class="remove-btn" data-action="remove">Remove</button>
+    </div>
+  `;
+  row.querySelector('[data-action="remove"]').addEventListener("click", ()=>{
+    row.remove();
+  });
+  wrap.appendChild(row);
+}
+
+document.getElementById("addCaptainBtn").addEventListener("click", ()=>{
+  addCaptainRow(null, currentCaptains.length);
+});
+
+// ============================================================
+// Settings: Admin Logins
+// ============================================================
+function renderAdminRows(){
+  const wrap = document.getElementById("adminRows");
+  wrap.innerHTML = "";
+  currentAdmins.forEach((a, i)=>{
+    addAdminRow(a, i);
+  });
+  renderLastEdited("adminsLastEdited", currentAdmins);
+}
+
+function addAdminRow(a, idx){
+  const wrap = document.getElementById("adminRows");
+  const row = document.createElement("div");
+  row.className = "admin-row";
+  const name = a ? a.name : "";
+  const password = a ? a.password : "";
+  const active = a ? a.active !== false : true;
+  row.innerHTML = `
+    <div>
+      <label>Name</label>
+      <input type="text" data-field="name" value="${escapeAttr(name)}" placeholder="Manager's name">
+    </div>
+    <div>
+      <label>Password</label>
+      <input type="text" data-field="password" value="${escapeAttr(String(password || ""))}" placeholder="Password">
+    </div>
+    <div class="chk">
+      <input type="checkbox" data-field="active" ${active ? "checked" : ""}>
+      <label style="margin:0;">Active</label>
+    </div>
+    <div>
+      <button type="button" class="remove-btn" data-action="remove">Remove</button>
+    </div>
+  `;
+  row.querySelector('[data-action="remove"]').addEventListener("click", ()=>{
+    row.remove();
+  });
+  wrap.appendChild(row);
+}
+
+document.getElementById("addAdminBtn").addEventListener("click", ()=>{
+  addAdminRow(null, currentAdmins.length);
+});
+
+// ============================================================
+// Save settings
+// ============================================================
+document.getElementById("saveConfigBtn").addEventListener("click", async ()=>{
+  const rows = document.querySelectorAll("#configRows .config-row");
+  const pw = getPassword();
+  let okCount = 0;
+  for(const row of rows){
+    const boat = row.querySelector('[data-field="boat"]').value;
+    const tankCapacity = row.querySelector('[data-field="tankCapacity"]').value;
+    const currentBalance = row.querySelector('[data-field="currentBalance"]').value;
+    try{
+      const res = await fetch(CONFIG.SYNC_URL, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({
+          type: "adminUpdate",
+          action: "setConfig",
+          password: pw,
+          boat: boat,
+          tankCapacity: tankCapacity,
+          currentBalance: currentBalance
+        })
+      });
+      const data = await res.json();
+      if(data.status === "ok") okCount++;
+    }catch(err){ /* ignore, report below */ }
+  }
+  showToast(okCount === rows.length ? "Fuel tank settings saved." : "Some settings failed to save - check connection.");
+  await loadDashboard(pw);
+  await loadSettings();
+});
+
+document.getElementById("saveCaptainsBtn").addEventListener("click", async ()=>{
+  const pw = getPassword();
+  const rows = document.querySelectorAll("#captainRows .captain-row");
+  const captains = [];
+  rows.forEach(row=>{
+    const name = row.querySelector('[data-field="name"]').value.trim();
+    if(!name) return;
+    const pin = row.querySelector('[data-field="pin"]').value.trim();
+    const active = row.querySelector('[data-field="active"]').checked;
+    captains.push({ name, pin, active });
+  });
+  try{
+    const res = await fetch(CONFIG.SYNC_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({
+        type: "adminUpdate",
+        action: "setCaptains",
+        password: pw,
+        captains: captains
+      })
+    });
+    const data = await res.json();
+    if(data.status === "ok"){
+      showToast("Captain list saved.");
+      await loadSettings();
+    }else{
+      showToast("Failed to save: " + (data.message || "unknown error"));
+    }
+  }catch(err){
+    showToast("Failed to save - check connection.");
+  }
+});
+
+document.getElementById("saveAdminsBtn").addEventListener("click", async ()=>{
+  const pw = getPassword();
+  const rows = document.querySelectorAll("#adminRows .admin-row");
+  const admins = [];
+  rows.forEach(row=>{
+    const name = row.querySelector('[data-field="name"]').value.trim();
+    if(!name) return;
+    const password = row.querySelector('[data-field="password"]').value.trim();
+    const active = row.querySelector('[data-field="active"]').checked;
+    admins.push({ name, password, active });
+  });
+  try{
+    const res = await fetch(CONFIG.SYNC_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({
+        type: "adminUpdate",
+        action: "setAdmins",
+        password: pw,
+        admins: admins
+      })
+    });
+    const data = await res.json();
+    if(data.status === "ok"){
+      showToast("Admin logins saved.");
+      currentAdmins = data.admins || currentAdmins;
+      renderAdminRows();
+    }else{
+      showToast("Failed to save: " + (data.message || "unknown error"));
+    }
+  }catch(err){
+    showToast("Failed to save - check connection.");
+  }
+});
+
+// ============================================================
+// CSV export
+// ============================================================
+async function downloadCsv(sheet, filename){
+  const pw = getPassword();
+  if(CONFIG.SYNC_URL.indexOf("PASTE_YOUR") === 0){
+    showToast("Sync endpoint not configured yet.");
+    return;
+  }
+  try{
+    const res = await fetch(CONFIG.SYNC_URL + "?action=csv&sheet=" + sheet + "&password=" + encodeURIComponent(pw));
+    const text = await res.text();
+    if(text.trim().startsWith("{")){
+      // Looks like a JSON error response rather than CSV
+      try{
+        const data = JSON.parse(text);
+        if(data.status === "error"){
+          showToast("Export failed: " + data.message);
+          return;
+        }
+      }catch(e){ /* not JSON, treat as CSV */ }
+    }
+    const blob = new Blob([text], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }catch(err){
+    showToast("Export failed - check connection.");
+  }
+}
+
+document.getElementById("csvVoyageBtn").addEventListener("click", ()=>{
+  downloadCsv("voyage", "voyage_log.csv");
+});
+document.getElementById("csvCatchesBtn").addEventListener("click", ()=>{
+  downloadCsv("catches", "catches.csv");
+});
+
+// ============================================================
+// Refresh
+// ============================================================
+document.getElementById("refreshBtn").addEventListener("click", async ()=>{
+  const pw = getPassword();
+  const ok = await loadDashboard(pw);
+  if(ok){
+    await loadSettings();
+    showToast("Refreshed.");
+  }else{
+    showToast("Could not refresh - session expired or offline.");
+    clearPassword();
+    showLogin();
+  }
+});
+
+// ============================================================
+// Helpers
+// ============================================================
+function escapeAttr(s){
+  return String(s).replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+}
+
+// ============================================================
+// Init
+// ============================================================
+(async function init(){
+  const pw = getPassword();
+  if(pw){
+    const ok = await loadDashboard(pw);
+    if(ok){
+      showApp();
+      await loadSettings();
+      return;
+    }
+  }
+  showLogin();
+})();
+</script>
+</body>
+</html>

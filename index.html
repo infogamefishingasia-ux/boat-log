@@ -1,0 +1,804 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Aqua Creed - Boat Log</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#1F4E78">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+  :root{
+    --navy:#1F4E78;
+    --navy-dark:#163a59;
+    --teal:#2a9d8f;
+    --bg:#f4f6f8;
+    --card:#ffffff;
+    --text:#1a1a1a;
+    --muted:#6b7280;
+    --warn:#e76f51;
+    --ok:#2a9d8f;
+    --border:#d8dee4;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+    background:var(--bg); color:var(--text); padding-bottom:80px;
+  }
+  header{
+    background:var(--navy); color:#fff; padding:16px 16px 14px;
+    position:sticky; top:0; z-index:10;
+    display:flex; align-items:center; gap:10px;
+  }
+  header h1{margin:0; font-size:18px; font-weight:700;}
+  header .sub{font-size:12px; opacity:.85; margin-top:2px;}
+  header .logo{width:40px; height:40px; flex-shrink:0;}
+  .status-bar{
+    display:flex; gap:8px; align-items:center; justify-content:space-between;
+    padding:10px 16px; background:var(--navy-dark); color:#fff; font-size:13px;
+  }
+  .session-bar{
+    display:flex; gap:8px; align-items:center; justify-content:space-between;
+    padding:6px 16px; background:var(--navy-dark); color:#fff; font-size:12px;
+    border-top:1px solid #ffffff22;
+  }
+  .session-bar .who{opacity:.9;}
+  .link-btn{
+    background:none; border:none; color:#9be8de; text-decoration:underline;
+    font-size:12px; cursor:pointer; padding:0;
+  }
+  .pill{
+    display:inline-flex; align-items:center; gap:6px;
+    padding:4px 10px; border-radius:999px; font-size:12px; font-weight:600;
+  }
+  .pill.online{background:#2a9d8f33; color:#9be8de;}
+  .pill.offline{background:#e76f5133; color:#ffd0c2;}
+  .pill.pending{background:#f4a26133; color:#ffe0bd;}
+  main{padding:12px; max-width:640px; margin:0 auto;}
+  .card{
+    background:var(--card); border:1px solid var(--border); border-radius:12px;
+    padding:14px; margin-bottom:12px;
+  }
+  .card h2{
+    font-size:14px; text-transform:uppercase; letter-spacing:.04em;
+    color:var(--navy); margin:0 0 12px; border-bottom:2px solid var(--bg); padding-bottom:8px;
+  }
+  .subhead{
+    font-size:12px; font-weight:700; color:var(--navy); text-transform:uppercase;
+    letter-spacing:.04em; margin:14px 0 6px;
+  }
+  .subhead:first-of-type{margin-top:0;}
+  label{display:block; font-size:13px; font-weight:600; margin:10px 0 4px; color:#333;}
+  label .opt{font-weight:400; color:var(--muted); font-size:11px;}
+  select, input, textarea{
+    width:100%; padding:11px 10px; font-size:16px; border:1px solid var(--border);
+    border-radius:8px; background:#fff; color:var(--text); font-family:inherit;
+  }
+  textarea{resize:vertical; min-height:60px;}
+  input[readonly]{background:#eef1f4; color:var(--muted);}
+  .row2{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
+  .row3{display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px;}
+  .hint{font-size:11px; color:var(--muted); margin-top:4px;}
+  .actions{
+    position:fixed; bottom:0; left:0; right:0; background:#fff;
+    border-top:1px solid var(--border); padding:10px 12px;
+    display:flex; gap:10px; max-width:640px; margin:0 auto;
+  }
+  button{
+    flex:1; padding:14px; font-size:15px; font-weight:700; border:none;
+    border-radius:10px; cursor:pointer;
+  }
+  .btn-primary{background:var(--navy); color:#fff;}
+  .btn-secondary{background:#eef1f4; color:var(--navy);}
+  .btn-primary:active, .btn-secondary:active{opacity:.8;}
+  .toast{
+    position:fixed; top:64px; left:50%; transform:translateX(-50%);
+    background:#1a1a1a; color:#fff; padding:10px 18px; border-radius:8px;
+    font-size:13px; z-index:50; opacity:0; transition:opacity .25s;
+    pointer-events:none; max-width:90%; text-align:center;
+  }
+  .toast.show{opacity:1;}
+  .queue-list{font-size:12px; color:var(--muted); margin-top:6px;}
+  .queue-item{
+    display:flex; justify-content:space-between; padding:6px 0;
+    border-bottom:1px solid var(--bg);
+  }
+  .queue-item:last-child{border-bottom:none;}
+  .badge{
+    font-size:10px; font-weight:700; padding:2px 7px; border-radius:999px;
+  }
+  .badge.pending{background:#fdebd0; color:#a3691b;}
+  .badge.synced{background:#d8f0ec; color:#1f6f63;}
+  .badge.error{background:#fbdcd6; color:#a3341b;}
+  details summary{cursor:pointer; font-weight:600; color:var(--navy); padding:6px 0;}
+  .footer-note{font-size:11px; color:var(--muted); text-align:center; padding:8px 0 0;}
+  .footer-note a{color:var(--navy); font-weight:600;}
+
+  /* Login screen */
+  .login-screen{
+    position:fixed; inset:0; background:var(--navy); display:flex;
+    align-items:center; justify-content:center; padding:20px; z-index:100;
+  }
+  .login-screen.hidden{display:none;}
+  .login-card{
+    background:#fff; border-radius:14px; padding:24px; width:100%; max-width:360px;
+  }
+  .login-card h1{font-size:18px; color:var(--navy); margin:0 0 4px;}
+  .login-card p{font-size:13px; color:var(--muted); margin:0 0 14px;}
+  .login-card button{width:100%; margin-top:14px;}
+  .login-hint{font-size:12px; color:var(--warn); margin-top:8px; min-height:16px;}
+  #appScreen.hidden{display:none;}
+</style>
+</head>
+<body>
+
+<!-- ============================================================ -->
+<!-- Login screen                                                  -->
+<!-- ============================================================ -->
+<div class="login-screen" id="loginScreen">
+  <div class="login-card">
+    <h1>Aqua Creed - Boat Log</h1>
+    <p>Select your name and enter your PIN to start logging.</p>
+
+    <label for="loginCaptain">Captain</label>
+    <select id="loginCaptain"></select>
+
+    <label for="loginPin">PIN</label>
+    <input type="password" id="loginPin" inputmode="numeric" maxlength="4" pattern="[0-9]*" placeholder="4-digit PIN">
+
+    <button type="button" class="btn-primary" id="loginBtn">Log In</button>
+    <div class="login-hint" id="loginHint"></div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- Main app                                                      -->
+<!-- ============================================================ -->
+<div id="appScreen" class="hidden">
+
+<header>
+  <img src="logo.png" alt="GameFishingAsia.com - Predator Fishing" class="logo">
+  <div>
+    <h1>Aqua Creed - Boat Log</h1>
+    <div class="sub">Daily voyage entry</div>
+  </div>
+</header>
+
+<div class="status-bar">
+  <span id="connPill" class="pill offline">● Offline</span>
+  <span id="queuePill" class="pill pending">0 pending</span>
+</div>
+<div class="session-bar">
+  <span class="who" id="loggedInLabel">Logged in as: -</span>
+  <button type="button" class="link-btn" id="logoutBtn">Switch captain</button>
+</div>
+
+<main>
+  <form id="logForm">
+
+    <div class="card">
+      <h2>Voyage Details</h2>
+
+      <label for="date">Date</label>
+      <input type="date" id="date" required>
+
+      <div class="row2">
+        <div>
+          <label for="boat">Boat</label>
+          <select id="boat" required></select>
+        </div>
+        <div>
+          <label for="captainDisplay">Captain</label>
+          <input type="text" id="captainDisplay" readonly>
+        </div>
+      </div>
+
+      <label for="crew">Crew <span class="opt">(type names, comma separated)</span></label>
+      <input type="text" id="crew" placeholder="e.g. Suresh, Manoj">
+
+      <div class="row2">
+        <div>
+          <label for="departurePort">Departure Port</label>
+          <select id="departurePort" required></select>
+        </div>
+        <div>
+          <label for="arrivalPort">Arrival Port</label>
+          <select id="arrivalPort" required></select>
+        </div>
+      </div>
+
+      <label for="areaFished">Area Fished</label>
+      <select id="areaFished"></select>
+
+      <label for="guests">Guests <span class="opt">(head-count)</span></label>
+      <input type="number" id="guests" min="0" step="1" inputmode="numeric">
+    </div>
+
+    <div class="card">
+      <h2>Weather</h2>
+      <div class="row3">
+        <div>
+          <label for="windDirection">Wind Direction</label>
+          <select id="windDirection"></select>
+        </div>
+        <div>
+          <label for="seaCondition">Sea Condition</label>
+          <select id="seaCondition"></select>
+        </div>
+        <div>
+          <label for="skyWeather">Sky / Weather</label>
+          <select id="skyWeather"></select>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Engine Hours</h2>
+
+      <div class="subhead">Start Reading</div>
+      <div class="row2">
+        <div>
+          <label for="engPortStart">Port Engine</label>
+          <input type="number" id="engPortStart" step="0.1" inputmode="decimal">
+        </div>
+        <div>
+          <label for="engStbdStart">Stbd Engine</label>
+          <input type="number" id="engStbdStart" step="0.1" inputmode="decimal">
+        </div>
+      </div>
+
+      <div class="subhead">End Reading</div>
+      <div class="row2">
+        <div>
+          <label for="engPortStop">Port Engine</label>
+          <input type="number" id="engPortStop" step="0.1" inputmode="decimal">
+        </div>
+        <div>
+          <label for="engStbdStop">Stbd Engine</label>
+          <input type="number" id="engStbdStop" step="0.1" inputmode="decimal">
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Fuel</h2>
+      <div class="row2">
+        <div>
+          <label for="fuelStart">Tank - Start (L) <span class="opt">(auto)</span></label>
+          <input type="number" id="fuelStart" step="0.1" inputmode="decimal" readonly>
+        </div>
+        <div>
+          <label for="fuelFilled">Filled (L)</label>
+          <input type="number" id="fuelFilled" step="0.1" inputmode="decimal" value="0">
+        </div>
+      </div>
+      <div class="row2">
+        <div>
+          <label for="fuelStop">Tank - Stop (L)</label>
+          <input type="number" id="fuelStop" step="0.1" inputmode="decimal">
+        </div>
+        <div>
+          <label for="fuelUsed">Used (L) <span class="opt">(auto)</span></label>
+          <input type="number" id="fuelUsed" step="0.1" inputmode="decimal" readonly>
+        </div>
+      </div>
+      <div class="hint" id="fuelBalanceHint">Select a boat to load its current tank reading.</div>
+
+      <label for="distanceRun">Distance Run (NM)</label>
+      <input type="number" id="distanceRun" step="0.1" inputmode="decimal">
+    </div>
+
+    <div class="card">
+      <h2>Catches</h2>
+      <div class="row3">
+        <div>
+          <label for="gtCount">GT Count</label>
+          <input type="number" id="gtCount" min="0" step="1" inputmode="numeric" value="0">
+        </div>
+        <div>
+          <label for="dogtoothCount">Dogtooth Count</label>
+          <input type="number" id="dogtoothCount" min="0" step="1" inputmode="numeric" value="0">
+        </div>
+        <div>
+          <label for="otherFishCount">Other Fish Count</label>
+          <input type="number" id="otherFishCount" min="0" step="1" inputmode="numeric" value="0">
+        </div>
+      </div>
+
+      <label for="gtOver30">GT over 30 kg or 120 cm <span class="opt">(weights in kg or lengths in cm, comma separated)</span></label>
+      <input type="text" id="gtOver30" placeholder="e.g. 32,38,120">
+
+      <label for="gtLength">GT Length <span class="opt">(length in cm, comma separated)</span></label>
+      <input type="text" id="gtLength" placeholder="e.g. 95,112,130">
+
+      <label for="dogtoothOver20">Dogtooth over 20kg <span class="opt">(weights in kg, comma separated)</span></label>
+      <input type="text" id="dogtoothOver20" placeholder="e.g. 38,51,65,73">
+
+      <label for="catchNotes">Catch Notes <span class="opt">(other species, optional)</span></label>
+      <input type="text" id="catchNotes" placeholder="e.g. 3x Yellowfin Tuna">
+    </div>
+
+    <div class="card">
+      <h2>Day Notes</h2>
+      <textarea id="dayNotes" placeholder="General notes about the day's voyage..."></textarea>
+    </div>
+
+    <div class="card">
+      <h2>Sync Queue</h2>
+      <div id="queueSummary">No entries saved yet.</div>
+      <div class="queue-list" id="queueList"></div>
+      <details style="margin-top:8px;">
+        <summary>Apps Script connection</summary>
+        <p class="hint">Endpoint is configured in this app's code (CONFIG.SYNC_URL). If syncing fails repeatedly, check the URL with your admin.</p>
+      </details>
+    </div>
+
+    <p class="footer-note">
+      Entries save to this device immediately, even with no signal.<br>
+      They sync automatically when you're back on wifi or mobile data.<br>
+      <a href="admin.html">Admin Dashboard →</a>
+    </p>
+
+  </form>
+</main>
+
+<div class="actions">
+  <button type="button" class="btn-secondary" id="syncBtn">Sync Now</button>
+  <button type="button" class="btn-primary" id="saveBtn">Save Entry</button>
+</div>
+
+</div><!-- /#appScreen -->
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ============================================================
+// CONFIG - dropdown lists & sync endpoint
+// ============================================================
+const CONFIG = {
+  // Replace with your deployed Apps Script web app URL (ends in /exec)
+  SYNC_URL: "https://script.google.com/a/macros/gamefishingasia.com/s/AKfycbxp7xJxtc_B6fkQBP54wEsy1cMU4Ug5O0q_9vNJhjZUS8JcjxLQt514aU9wZA3RqLRp/exec",
+
+  DROPDOWNS: {
+    boat: ["RAMPAGE","REEFRAIDER","TROPICAL STAR","HALCYON III"],
+    captain: ["Captain Rama Rao","Captain B Arjun Kumar","Captain Dilip Ekka","Captain Krishna Rao","Captain TBD"],
+    port: ["Port Blair","Hut Bay (Little Andaman)","Diglipur (North Andaman)","Havelock (Swaraj Dweep)","Neil Island (Shaheed Dweep)","Chiriya Tapu","Rangat","Mayabunder","Other"],
+    area: ["Rutland","Cinque Island","The Sisters","Passage","Wall","Nirupak Patch","South Sentinel","Invisible Bank","Incredible Bank","Barren Island","Neil Island","Off Diglipur","Landfall/ East Island","Other"],
+    windDirection: ["N","NE","E","SE","S","SW","W","NW","Variable"],
+    seaCondition: ["Calm / Glassy","Slight","Moderate","Rough","Very Rough"],
+    skyWeather: ["Clear","Partly Cloudy","Cloudy","Overcast","Light Rain","Heavy Rain","Squall / Storm"]
+  }
+};
+
+const QUEUE_KEY = "boatlog_queue_v1";
+const BOOTSTRAP_KEY = "boatlog_bootstrap_v1";
+const SESSION_KEY = "boatlog_captain_v1";
+
+// ============================================================
+// Setup: populate dropdowns, default date
+// ============================================================
+function fillSelect(id, values, placeholder){
+  const el = document.getElementById(id);
+  const prev = el.value;
+  el.innerHTML = "";
+  if(placeholder){
+    const opt = document.createElement("option");
+    opt.value = ""; opt.textContent = placeholder;
+    el.appendChild(opt);
+  }
+  values.forEach(v=>{
+    const opt = document.createElement("option");
+    opt.value = v; opt.textContent = v;
+    el.appendChild(opt);
+  });
+  if(prev && values.indexOf(prev) !== -1) el.value = prev;
+}
+
+function boatNames(){
+  const bs = loadBootstrap();
+  if(bs && bs.boats && bs.boats.length) return bs.boats.map(b=>b.boat);
+  return CONFIG.DROPDOWNS.boat;
+}
+
+fillSelect("boat", boatNames(), "Select boat");
+fillSelect("departurePort", CONFIG.DROPDOWNS.port, "Select port");
+fillSelect("arrivalPort", CONFIG.DROPDOWNS.port, "Select port");
+fillSelect("areaFished", CONFIG.DROPDOWNS.area, "Select area");
+fillSelect("windDirection", CONFIG.DROPDOWNS.windDirection, "Select");
+fillSelect("seaCondition", CONFIG.DROPDOWNS.seaCondition, "Select");
+fillSelect("skyWeather", CONFIG.DROPDOWNS.skyWeather, "Select");
+
+document.getElementById("date").valueAsDate = new Date();
+
+// ============================================================
+// Toast helper
+// ============================================================
+let toastTimer;
+function showToast(msg){
+  const t = document.getElementById("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>t.classList.remove("show"), 2600);
+}
+
+// ============================================================
+// Bootstrap (boat tank balances + captain PINs) - cached offline
+// ============================================================
+function loadBootstrap(){
+  try{ return JSON.parse(localStorage.getItem(BOOTSTRAP_KEY)) || null; }
+  catch(e){ return null; }
+}
+function saveBootstrap(data){
+  localStorage.setItem(BOOTSTRAP_KEY, JSON.stringify(data));
+}
+
+async function refreshBootstrap(){
+  if(CONFIG.SYNC_URL.indexOf("PASTE_YOUR") === 0) return;
+  try{
+    const res = await fetch(CONFIG.SYNC_URL + "?action=bootstrap");
+    const data = await res.json();
+    if(data.status === "ok"){
+      saveBootstrap({ boats: data.boats || [], captains: data.captains || [], fetchedAt: Date.now() });
+      populateLoginCaptains();
+      fillSelect("boat", boatNames(), "Select boat");
+      refreshFuelStart();
+    }
+  }catch(err){ /* offline - keep using cached copy */ }
+}
+
+function populateLoginCaptains(){
+  const bs = loadBootstrap();
+  const sel = document.getElementById("loginCaptain");
+  const prev = sel.value;
+  sel.innerHTML = "";
+  const captains = (bs && bs.captains && bs.captains.length)
+    ? bs.captains.filter(c=>c.active)
+    : CONFIG.DROPDOWNS.captain.map(name=>({ name, pin: "" }));
+  captains.forEach(c=>{
+    const opt = document.createElement("option");
+    opt.value = c.name; opt.textContent = c.name;
+    sel.appendChild(opt);
+  });
+  if(prev && captains.some(c=>c.name===prev)) sel.value = prev;
+}
+
+// ============================================================
+// Login / session
+// ============================================================
+function getLoggedInCaptain(){
+  return localStorage.getItem(SESSION_KEY) || "";
+}
+function setLoggedInCaptain(name){
+  localStorage.setItem(SESSION_KEY, name);
+}
+function clearLoggedInCaptain(){
+  localStorage.removeItem(SESSION_KEY);
+}
+
+function showLogin(){
+  document.getElementById("loginScreen").classList.remove("hidden");
+  document.getElementById("appScreen").classList.add("hidden");
+  document.getElementById("loginPin").value = "";
+  document.getElementById("loginHint").textContent = "";
+  populateLoginCaptains();
+}
+
+function showApp(){
+  const name = getLoggedInCaptain();
+  document.getElementById("loggedInLabel").textContent = "Logged in as: " + name;
+  document.getElementById("captainDisplay").value = name;
+  document.getElementById("loginScreen").classList.add("hidden");
+  document.getElementById("appScreen").classList.remove("hidden");
+  refreshFuelStart();
+}
+
+document.getElementById("loginBtn").addEventListener("click", ()=>{
+  const name = document.getElementById("loginCaptain").value;
+  const pin = document.getElementById("loginPin").value.trim();
+  const bs = loadBootstrap();
+  const captains = (bs && bs.captains) || [];
+  const captain = captains.find(c=>c.name === name);
+
+  if(!name){
+    document.getElementById("loginHint").textContent = "Select your name.";
+    return;
+  }
+  if(!captain){
+    document.getElementById("loginHint").textContent = "Captain list not loaded yet. Connect to wifi/data once, then try again.";
+    return;
+  }
+  if(!captain.pin){
+    document.getElementById("loginHint").textContent = "No PIN set for this captain yet. Ask the admin to set one in the Admin Dashboard.";
+    return;
+  }
+  if(pin !== String(captain.pin)){
+    document.getElementById("loginHint").textContent = "Incorrect PIN.";
+    return;
+  }
+  setLoggedInCaptain(name);
+  showApp();
+});
+
+document.getElementById("logoutBtn").addEventListener("click", ()=>{
+  clearLoggedInCaptain();
+  showLogin();
+});
+
+// ============================================================
+// Queue (localStorage) helpers
+// ============================================================
+function loadQueue(){
+  try{ return JSON.parse(localStorage.getItem(QUEUE_KEY)) || []; }
+  catch(e){ return []; }
+}
+function saveQueue(q){
+  localStorage.setItem(QUEUE_KEY, JSON.stringify(q));
+}
+function renderQueue(){
+  const q = loadQueue();
+  const pendingCount = q.filter(e=>e.status==="pending" || e.status==="error").length;
+  document.getElementById("queuePill").textContent = pendingCount + " pending";
+  document.getElementById("queuePill").className = "pill " + (pendingCount>0 ? "pending" : "online");
+
+  const summary = document.getElementById("queueSummary");
+  const list = document.getElementById("queueList");
+  if(q.length === 0){
+    summary.textContent = "No entries saved yet.";
+    list.innerHTML = "";
+    return;
+  }
+  summary.textContent = q.length + " entries on this device (most recent first):";
+  list.innerHTML = "";
+  q.slice().reverse().slice(0,10).forEach(e=>{
+    const div = document.createElement("div");
+    div.className = "queue-item";
+    const badgeClass = e.status === "synced" ? "synced" : (e.status === "error" ? "error" : "pending");
+    const label = e.status === "synced" ? "Synced" : (e.status === "error" ? "Retry" : "Pending");
+    div.innerHTML = `<span>${e.voyage.date} - ${e.voyage.boat}</span><span class="badge ${badgeClass}">${label}</span>`;
+    list.appendChild(div);
+  });
+}
+
+// ============================================================
+// Fuel auto-calc: Tank Start (from cached balance) + Filled - Stop = Used
+// ============================================================
+function getBoatConfig(boat){
+  const bs = loadBootstrap();
+  if(!bs || !bs.boats) return null;
+  return bs.boats.find(b=>b.boat === boat) || null;
+}
+
+function refreshFuelStart(){
+  const boat = document.getElementById("boat").value;
+  const cfg = getBoatConfig(boat);
+  document.getElementById("fuelStart").value = cfg ? cfg.currentBalance : "";
+  updateFuelCalc();
+}
+
+function updateFuelCalc(){
+  const num = id => {
+    const x = document.getElementById(id).value;
+    return x === "" ? 0 : Number(x);
+  };
+  const start = num("fuelStart");
+  const filled = num("fuelFilled");
+  const stop = num("fuelStop");
+  const used = start + filled - stop;
+  document.getElementById("fuelUsed").value = used.toFixed(1);
+
+  const boat = document.getElementById("boat").value;
+  const cfg = getBoatConfig(boat);
+  const hint = document.getElementById("fuelBalanceHint");
+  if(cfg){
+    const stopVal = document.getElementById("fuelStop").value;
+    if(stopVal === ""){
+      hint.textContent = "Tank capacity: " + cfg.tankCapacity + " L. Current balance: " + cfg.currentBalance + " L.";
+    }else{
+      hint.textContent = "Balance after this entry: " + stop.toFixed(1) + " / " + cfg.tankCapacity + " L.";
+    }
+  }else{
+    hint.textContent = "Select a boat to load its current tank reading.";
+  }
+}
+
+document.getElementById("boat").addEventListener("change", refreshFuelStart);
+document.getElementById("fuelFilled").addEventListener("input", updateFuelCalc);
+document.getElementById("fuelStop").addEventListener("input", updateFuelCalc);
+
+// Locally update the cached tank balance so the next entry (even offline)
+// prefills correctly. Server-side sync also updates the Config sheet.
+function updateLocalBalance(boat, newBalance){
+  const bs = loadBootstrap();
+  if(!bs || !bs.boats) return;
+  const b = bs.boats.find(x=>x.boat === boat);
+  if(b){
+    b.currentBalance = Number(newBalance) || 0;
+    saveBootstrap(bs);
+  }
+}
+
+// ============================================================
+// Build entry object from form
+// ============================================================
+function buildEntry(){
+  const v = id => document.getElementById(id).value;
+  const num = id => {
+    const x = document.getElementById(id).value;
+    return x === "" ? 0 : Number(x);
+  };
+
+  const entryId = Date.now() + "-" + Math.random().toString(36).slice(2,8);
+  const captain = getLoggedInCaptain();
+
+  return {
+    entryId,
+    status: "pending",
+    voyage: {
+      date: v("date"),
+      boat: v("boat"),
+      captain: captain,
+      crew: v("crew"),
+      departurePort: v("departurePort"),
+      arrivalPort: v("arrivalPort"),
+      areaFished: v("areaFished"),
+      guests: num("guests"),
+      windDirection: v("windDirection"),
+      seaCondition: v("seaCondition"),
+      skyWeather: v("skyWeather"),
+      engPortStart: num("engPortStart"),
+      engPortStop: num("engPortStop"),
+      engStbdStart: num("engStbdStart"),
+      engStbdStop: num("engStbdStop"),
+      fuelStart: num("fuelStart"),
+      fuelFilled: num("fuelFilled"),
+      fuelUsed: num("fuelUsed"),
+      fuelStop: num("fuelStop"),
+      distanceRun: num("distanceRun"),
+      dayNotes: v("dayNotes"),
+      submittedBy: captain
+    },
+    catches: {
+      gtCount: num("gtCount"),
+      dogtoothCount: num("dogtoothCount"),
+      otherFishCount: num("otherFishCount"),
+      gtOver30: v("gtOver30"),
+      gtLength: v("gtLength"),
+      dogtoothOver20: v("dogtoothOver20"),
+      notes: v("catchNotes")
+    }
+  };
+}
+
+function validateForm(){
+  const required = ["date","boat","departurePort","arrivalPort"];
+  for(const id of required){
+    if(!document.getElementById(id).value){
+      showToast("Please fill in: " + id);
+      document.getElementById(id).focus();
+      return false;
+    }
+  }
+  if(document.getElementById("fuelStop").value === ""){
+    showToast("Please enter Fuel Tank - Stop (L)");
+    document.getElementById("fuelStop").focus();
+    return false;
+  }
+  return true;
+}
+
+function resetForm(){
+  document.getElementById("logForm").reset();
+  document.getElementById("date").valueAsDate = new Date();
+  ["gtCount","dogtoothCount","otherFishCount"].forEach(id=>{
+    document.getElementById(id).value = 0;
+  });
+  document.getElementById("fuelFilled").value = 0;
+  document.getElementById("captainDisplay").value = getLoggedInCaptain();
+  refreshFuelStart();
+}
+
+// ============================================================
+// Save entry
+// ============================================================
+document.getElementById("saveBtn").addEventListener("click", ()=>{
+  if(!validateForm()) return;
+  const entry = buildEntry();
+  const q = loadQueue();
+  q.push(entry);
+  saveQueue(q);
+  updateLocalBalance(entry.voyage.boat, entry.voyage.fuelStop);
+  renderQueue();
+  resetForm();
+  showToast("Saved on device. Will sync when online.");
+  if(navigator.onLine) syncQueue();
+});
+
+// ============================================================
+// Sync queue to Apps Script
+// ============================================================
+async function syncQueue(){
+  if(CONFIG.SYNC_URL.indexOf("PASTE_YOUR") === 0){
+    showToast("Sync endpoint not configured yet.");
+    return;
+  }
+  const q = loadQueue();
+  const pending = q.filter(e=>e.status==="pending" || e.status==="error");
+  if(pending.length === 0){
+    showToast("Nothing to sync.");
+    return;
+  }
+  showToast("Syncing " + pending.length + " entr" + (pending.length===1?"y":"ies") + "...");
+
+  for(const entry of pending){
+    try{
+      const res = await fetch(CONFIG.SYNC_URL, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" }, // avoids CORS preflight on Apps Script
+        body: JSON.stringify(entry)
+      });
+      const text = await res.text();
+      let ok = false;
+      try{ ok = JSON.parse(text).status === "ok"; } catch(e){ ok = text.indexOf("ok") !== -1; }
+      entry.status = ok ? "synced" : "error";
+    }catch(err){
+      entry.status = "error"; // stays in queue, retried later
+    }
+  }
+  saveQueue(q);
+  renderQueue();
+  const stillPending = loadQueue().filter(e=>e.status!=="synced").length;
+  showToast(stillPending===0 ? "All entries synced." : stillPending + " entr" + (stillPending===1?"y":"ies") + " still pending.");
+  refreshBootstrap();
+}
+
+document.getElementById("syncBtn").addEventListener("click", syncQueue);
+
+// ============================================================
+// Connectivity status + auto sync
+// ============================================================
+function updateConnPill(){
+  const pill = document.getElementById("connPill");
+  if(navigator.onLine){
+    pill.textContent = "● Online";
+    pill.className = "pill online";
+  }else{
+    pill.textContent = "● Offline";
+    pill.className = "pill offline";
+  }
+}
+window.addEventListener("online", ()=>{ updateConnPill(); syncQueue(); refreshBootstrap(); });
+window.addEventListener("offline", updateConnPill);
+updateConnPill();
+
+// ============================================================
+// Init
+// ============================================================
+populateLoginCaptains();
+if(getLoggedInCaptain()){
+  showApp();
+}else{
+  showLogin();
+}
+
+// Try syncing / refreshing on load (in case there are leftover pending entries)
+if(navigator.onLine){
+  syncQueue();
+  refreshBootstrap();
+}
+renderQueue();
+
+// Periodically refresh cached boat balances + captain PINs while the app is open
+setInterval(()=>{ if(navigator.onLine) refreshBootstrap(); }, 5 * 60 * 1000);
+
+// ============================================================
+// Service worker registration (offline app shell)
+// ============================================================
+if("serviceWorker" in navigator){
+  window.addEventListener("load", ()=>{
+    navigator.serviceWorker.register("sw.js").catch(()=>{});
+  });
+}
+</script>
+</body>
+</html>
