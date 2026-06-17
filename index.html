@@ -483,12 +483,12 @@ document.getElementById("date").valueAsDate = new Date();
 // Toast helper
 // ============================================================
 let toastTimer;
-function showToast(msg){
+function showToast(msg, duration){
   const t = document.getElementById("toast");
   t.textContent = msg;
   t.classList.add("show");
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(()=>t.classList.remove("show"), 2600);
+  toastTimer = setTimeout(()=>t.classList.remove("show"), duration || 2600);
 }
 
 // ============================================================
@@ -596,6 +596,7 @@ document.getElementById("loginBtn").addEventListener("click", async ()=>{
   }
   setLoggedInCaptain(name);
   showApp();
+  showToast("Hi " + name + "! Welcome back.", 4000);
 });
 
 document.getElementById("logoutBtn").addEventListener("click", ()=>{

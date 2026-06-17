@@ -107,6 +107,14 @@
   .modal-section{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--teal);grid-column:1/-1;margin-top:12px;padding-bottom:4px;border-bottom:1px solid var(--bg);}
   .voyage-row{cursor:pointer;transition:background .12s;}
   .voyage-row:hover td{background:#f0f4ff;}
+  /* Days Sailed two-column layout */
+  .days-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+  @media(max-width:500px){.days-grid{grid-template-columns:1fr;}}
+  .days-grid h3{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--navy);margin:0 0 8px;font-weight:700;}
+  /* Voyage log filter */
+  .filter-row{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
+  .filter-row label{font-size:12px;font-weight:600;color:var(--muted);white-space:nowrap;margin:0;}
+  .filter-row select{flex:1;padding:8px 10px;font-size:14px;}
 </style>
 </head>
 <body>
@@ -203,8 +211,36 @@
   </div>
 
   <div class="card">
+    <h2>Days Sailed This Season</h2>
+    <div class="days-grid">
+      <div>
+        <h3>By Boat</h3>
+        <div class="table-wrap">
+        <table id="daysByBoatTable">
+          <thead><tr><th>Boat</th><th>Days</th></tr></thead>
+          <tbody id="daysByBoatBody"></tbody>
+        </table>
+        </div>
+      </div>
+      <div>
+        <h3>By Captain</h3>
+        <div class="table-wrap">
+        <table id="daysByCaptainTable">
+          <thead><tr><th>Name</th><th>Days</th></tr></thead>
+          <tbody id="daysByCaptainBody"></tbody>
+        </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
     <h2>Voyage Log</h2>
     <p class="hint">Tap any row to see all fields logged by the captain for that voyage.</p>
+    <div class="filter-row">
+      <label for="voyageBoatFilter">Filter by Boat:</label>
+      <select id="voyageBoatFilter"><option value="">All Boats</option></select>
+    </div>
     <div class="table-wrap">
     <table id="voyageLogTable">
       <thead>
@@ -393,6 +429,9 @@ function renderDashboard(dash){
 
   // Catch totals by boat
   renderCatchByBoat(dash.boats || []);
+
+  // Days sailed (by boat uses voyageCount; by captain uses captainDays)
+  renderDaysSailed(dash.boats || [], dash.captainDays || []);
 
   // Voyage log
   renderVoyageLog(dash.voyageEntries || []);
@@ -739,21 +778,79 @@ function renderCatchByBoat(boats){
 }
 
 // ============================================================
+// Days Sailed This Season
+// ============================================================
+function renderDaysSailed(boats, captainDays){
+  // By boat (voyageCount = number of voyage entries = sailing days)
+  const boatBody = document.getElementById("daysByBoatBody");
+  boatBody.innerHTML = "";
+  boats.forEach(b=>{
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td>${escapeAttr(b.boat)}</td><td><strong>${b.voyageCount || 0}</strong></td>`;
+    boatBody.appendChild(tr);
+  });
+
+  // By captain
+  const captainBody = document.getElementById("daysByCaptainBody");
+  captainBody.innerHTML = "";
+  if(!captainDays || !captainDays.length){
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td colspan="2" style="color:var(--muted);font-style:italic;">No voyages logged yet.</td>`;
+    captainBody.appendChild(tr);
+    return;
+  }
+  captainDays.forEach(c=>{
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td>${escapeAttr(c.name)}</td><td><strong>${c.days}</strong></td>`;
+    captainBody.appendChild(tr);
+  });
+}
+
+// ============================================================
 // Voyage Log table + detail modal
 // ============================================================
 let cachedVoyageEntries = [];
 
 function renderVoyageLog(entries){
   cachedVoyageEntries = entries || [];
+
+  // Populate boat filter — preserve current selection
+  const filterSel = document.getElementById("voyageBoatFilter");
+  const prevFilter = filterSel.value;
+  filterSel.innerHTML = '<option value="">All Boats</option>';
+  const boats = [...new Set(cachedVoyageEntries.map(v => v.boat).filter(Boolean))].sort();
+  boats.forEach(b=>{
+    const opt = document.createElement("option");
+    opt.value = b; opt.textContent = b;
+    filterSel.appendChild(opt);
+  });
+  if(boats.includes(prevFilter)) filterSel.value = prevFilter;
+
+  filterVoyageLog();
+}
+
+function filterVoyageLog(){
+  const filter = document.getElementById("voyageBoatFilter").value;
+  const filtered = filter
+    ? cachedVoyageEntries.filter(v => v.boat === filter)
+    : cachedVoyageEntries;
+
   const tbody = document.getElementById("voyageLogBody");
   const hint  = document.getElementById("voyageLogHint");
   tbody.innerHTML = "";
+
   if(!cachedVoyageEntries.length){
     hint.textContent = "No voyages logged yet.";
     return;
   }
-  hint.textContent = cachedVoyageEntries.length + " entr" + (cachedVoyageEntries.length === 1 ? "y" : "ies") + " — tap a row to see full details";
-  cachedVoyageEntries.forEach((v, idx)=>{
+  const total = cachedVoyageEntries.length;
+  const shown = filtered.length;
+  hint.textContent = shown + " of " + total + " entr" + (total === 1 ? "y" : "ies")
+    + (filter ? " for " + filter : "")
+    + " — tap a row to see full details";
+
+  filtered.forEach(v=>{
+    const realIdx = cachedVoyageEntries.indexOf(v);
     const tr = document.createElement("tr");
     tr.className = "voyage-row";
     tr.innerHTML = `
@@ -763,10 +860,12 @@ function renderVoyageLog(entries){
       <td>${escapeAttr(v.areaFished || "—")}</td>
       <td>${fmt(v.fuelUsed)}</td>
     `;
-    tr.addEventListener("click", ()=> showVoyageDetail(idx));
+    tr.addEventListener("click", ()=> showVoyageDetail(realIdx));
     tbody.appendChild(tr);
   });
 }
+
+document.getElementById("voyageBoatFilter").addEventListener("change", filterVoyageLog);
 
 function showVoyageDetail(idx){
   const v = cachedVoyageEntries[idx];
