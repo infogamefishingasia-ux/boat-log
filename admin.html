@@ -94,6 +94,19 @@
   .login-hint{font-size:12px; color:var(--warn); margin-top:8px; min-height:16px;}
   #appScreen.hidden{display:none;}
   .remove-btn{background:#fbdcd6; color:#a3341b; padding:11px 12px;}
+  /* Voyage detail modal */
+  .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:200;display:flex;align-items:center;justify-content:center;padding:16px;}
+  .modal-overlay.hidden{display:none;}
+  .modal-card{background:#fff;border-radius:14px;padding:20px;width:100%;max-width:580px;max-height:90vh;overflow-y:auto;}
+  .modal-card h3{font-size:15px;color:var(--navy);margin:0 0 14px;padding-right:28px;}
+  .modal-close{float:right;background:none;border:none;font-size:22px;cursor:pointer;color:var(--muted);padding:0;line-height:1;margin-top:-2px;}
+  .modal-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px 16px;font-size:13px;}
+  .modal-fl{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.03em;margin-top:8px;}
+  .modal-fv{font-weight:600;word-break:break-word;}
+  .modal-full{grid-column:1/-1;}
+  .modal-section{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--teal);grid-column:1/-1;margin-top:12px;padding-bottom:4px;border-bottom:1px solid var(--bg);}
+  .voyage-row{cursor:pointer;transition:background .12s;}
+  .voyage-row:hover td{background:#f0f4ff;}
 </style>
 </head>
 <body>
@@ -142,8 +155,10 @@
           <th>Fuel Available (L)</th>
           <th>Tank Capacity (L)</th>
           <th>Avg Fuel / Voyage (L)</th>
-          <th>Port Eng Hrs</th>
-          <th>Stbd Eng Hrs</th>
+          <th>Port Eng Hrs (Run)</th>
+          <th>Stbd Eng Hrs (Run)</th>
+          <th>Port Eng Hrs Total</th>
+          <th>Stbd Eng Hrs Total</th>
         </tr>
       </thead>
       <tbody id="fleetTableBody"></tbody>
@@ -168,6 +183,43 @@
         <div class="lbl">Total Dogtooth Count</div>
       </div>
     </div>
+  </div>
+
+  <div class="card">
+    <h2>Catch Totals by Boat</h2>
+    <div class="table-wrap">
+    <table id="catchByBoatTable">
+      <thead>
+        <tr>
+          <th>Boat</th>
+          <th>Total GT Count</th>
+          <th>GT &gt; 30kg / 120cm</th>
+          <th>Total Dogtooth Count</th>
+        </tr>
+      </thead>
+      <tbody id="catchByBoatBody"></tbody>
+    </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Voyage Log</h2>
+    <p class="hint">Tap any row to see all fields logged by the captain for that voyage.</p>
+    <div class="table-wrap">
+    <table id="voyageLogTable">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Boat</th>
+          <th>Captain</th>
+          <th>Area Fished</th>
+          <th>Fuel Used (L)</th>
+        </tr>
+      </thead>
+      <tbody id="voyageLogBody"></tbody>
+    </table>
+    </div>
+    <div class="hint" id="voyageLogHint"></div>
   </div>
 
   <div class="card">
@@ -199,7 +251,7 @@
     </div>
   </div>
 
-  <div class="card">
+  <div class="card" id="superAdminOnlyCard">
     <h2>Settings: Admin Logins</h2>
     <p class="hint">Set a password for each person who should be able to open this dashboard (you + your managers). Untick "Active" to disable a login without deleting it. At least one active login with a password must always remain.</p>
     <div class="hint" id="adminsLastEdited"></div>
@@ -218,6 +270,15 @@
 </main>
 
 </div><!-- /#appScreen -->
+
+<!-- Voyage detail modal -->
+<div class="modal-overlay hidden" id="voyageModal">
+  <div class="modal-card">
+    <button class="modal-close" id="voyageModalClose" aria-label="Close">&#10005;</button>
+    <h3 id="voyageModalTitle">Voyage Details</h3>
+    <div class="modal-grid" id="voyageModalContent"></div>
+  </div>
+</div>
 
 <div class="toast" id="toast"></div>
 
@@ -307,30 +368,44 @@ async function loadDashboard(pw){
 }
 
 function renderDashboard(dash){
+  // Fleet overview table
   const body = document.getElementById("fleetTableBody");
   body.innerHTML = "";
   (dash.boats || []).forEach(b=>{
     const tr = document.createElement("tr");
     tr.innerHTML = `
-      <td>${b.boat}</td>
+      <td>${escapeAttr(b.boat)}</td>
       <td>${fmt(b.fuelAvailable)}</td>
       <td>${fmt(b.tankCapacity)}</td>
       <td>${fmt(b.avgFuelConsumption)}</td>
       <td>${fmt(b.portEngineHours)}</td>
       <td>${fmt(b.stbdEngineHours)}</td>
+      <td>${fmt(b.lastPortEngStop)}</td>
+      <td>${fmt(b.lastStbdEngStop)}</td>
     `;
     body.appendChild(tr);
   });
 
+  // Catch totals — all boats combined
   document.getElementById("totalGT").textContent = (dash.totals && dash.totals.gtCount) || 0;
   document.getElementById("totalGTOver30").textContent = (dash.totals && dash.totals.gtOver30Count) || 0;
   document.getElementById("totalDogtooth").textContent = (dash.totals && dash.totals.dogtoothCount) || 0;
+
+  // Catch totals by boat
+  renderCatchByBoat(dash.boats || []);
+
+  // Voyage log
+  renderVoyageLog(dash.voyageEntries || []);
 
   document.getElementById("fleetLastUpdated").textContent = "Updated " + new Date().toLocaleString();
 
   document.getElementById("loggedInAs").textContent = dash.loggedInAs ? ("Logged in as: " + dash.loggedInAs) : "";
   currentAdmins = dash.admins || [];
   renderAdminRows();
+
+  // Role-based access: only Darran (super admin) sees Settings: Admin Logins
+  const superAdminCard = document.getElementById("superAdminOnlyCard");
+  if(superAdminCard) superAdminCard.style.display = dash.isSuperAdmin ? "" : "none";
 }
 
 function fmt(n){
@@ -642,6 +717,104 @@ document.getElementById("refreshBtn").addEventListener("click", async ()=>{
     showToast("Could not refresh - session expired or offline.");
     clearPassword();
     showLogin();
+  }
+});
+
+// ============================================================
+// Catch Totals by Boat
+// ============================================================
+function renderCatchByBoat(boats){
+  const tbody = document.getElementById("catchByBoatBody");
+  tbody.innerHTML = "";
+  boats.forEach(b=>{
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${escapeAttr(b.boat)}</td>
+      <td>${b.gtCount || 0}</td>
+      <td>${b.gtOver30Count || 0}</td>
+      <td>${b.dogtoothCount || 0}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+// ============================================================
+// Voyage Log table + detail modal
+// ============================================================
+let cachedVoyageEntries = [];
+
+function renderVoyageLog(entries){
+  cachedVoyageEntries = entries || [];
+  const tbody = document.getElementById("voyageLogBody");
+  const hint  = document.getElementById("voyageLogHint");
+  tbody.innerHTML = "";
+  if(!cachedVoyageEntries.length){
+    hint.textContent = "No voyages logged yet.";
+    return;
+  }
+  hint.textContent = cachedVoyageEntries.length + " entr" + (cachedVoyageEntries.length === 1 ? "y" : "ies") + " — tap a row to see full details";
+  cachedVoyageEntries.forEach((v, idx)=>{
+    const tr = document.createElement("tr");
+    tr.className = "voyage-row";
+    tr.innerHTML = `
+      <td>${escapeAttr(v.date)}</td>
+      <td>${escapeAttr(v.boat)}</td>
+      <td>${escapeAttr(v.captain)}</td>
+      <td>${escapeAttr(v.areaFished || "—")}</td>
+      <td>${fmt(v.fuelUsed)}</td>
+    `;
+    tr.addEventListener("click", ()=> showVoyageDetail(idx));
+    tbody.appendChild(tr);
+  });
+}
+
+function showVoyageDetail(idx){
+  const v = cachedVoyageEntries[idx];
+  if(!v) return;
+  document.getElementById("voyageModalTitle").textContent =
+    v.date + "  —  " + v.boat + "  —  " + v.captain;
+  const content = document.getElementById("voyageModalContent");
+  content.innerHTML = `
+    <div class="modal-section">Voyage</div>
+    <div><div class="modal-fl">Date</div><div class="modal-fv">${escapeAttr(v.date)}</div></div>
+    <div><div class="modal-fl">Boat</div><div class="modal-fv">${escapeAttr(v.boat)}</div></div>
+    <div><div class="modal-fl">Captain</div><div class="modal-fv">${escapeAttr(v.captain)}</div></div>
+    <div><div class="modal-fl">Crew</div><div class="modal-fv">${escapeAttr(v.crew || "—")}</div></div>
+    <div><div class="modal-fl">Guests</div><div class="modal-fv">${v.guests || 0}</div></div>
+    <div><div class="modal-fl">Departure Port</div><div class="modal-fv">${escapeAttr(v.departurePort || "—")}</div></div>
+    <div><div class="modal-fl">Arrival Port</div><div class="modal-fv">${escapeAttr(v.arrivalPort || "—")}</div></div>
+    <div class="modal-full"><div class="modal-fl">Area Fished</div><div class="modal-fv">${escapeAttr(v.areaFished || "—")}</div></div>
+    <div class="modal-section">Weather</div>
+    <div><div class="modal-fl">Wind Direction</div><div class="modal-fv">${escapeAttr(v.windDirection || "—")}</div></div>
+    <div><div class="modal-fl">Sea Condition</div><div class="modal-fv">${escapeAttr(v.seaCondition || "—")}</div></div>
+    <div class="modal-full"><div class="modal-fl">Sky / Weather</div><div class="modal-fv">${escapeAttr(v.skyWeather || "—")}</div></div>
+    <div class="modal-section">Engine Hours</div>
+    <div><div class="modal-fl">Port Start</div><div class="modal-fv">${fmt(v.engPortStart)}</div></div>
+    <div><div class="modal-fl">Port Stop</div><div class="modal-fv">${fmt(v.engPortStop)}</div></div>
+    <div><div class="modal-fl">Stbd Start</div><div class="modal-fv">${fmt(v.engStbdStart)}</div></div>
+    <div><div class="modal-fl">Stbd Stop</div><div class="modal-fv">${fmt(v.engStbdStop)}</div></div>
+    <div><div class="modal-fl">Port Run (hrs)</div><div class="modal-fv">${fmt(v.portEngRun)}</div></div>
+    <div><div class="modal-fl">Stbd Run (hrs)</div><div class="modal-fv">${fmt(v.stbdEngRun)}</div></div>
+    <div class="modal-section">Fuel</div>
+    <div><div class="modal-fl">Tank Start (L)</div><div class="modal-fv">${fmt(v.fuelStart)}</div></div>
+    <div><div class="modal-fl">Fuel Filled (L)</div><div class="modal-fv">${fmt(v.fuelFilled)}</div></div>
+    <div><div class="modal-fl">Fuel Used (L)</div><div class="modal-fv">${fmt(v.fuelUsed)}</div></div>
+    <div><div class="modal-fl">Tank Stop (L)</div><div class="modal-fv">${fmt(v.fuelStop)}</div></div>
+    <div><div class="modal-fl">Distance Run (NM)</div><div class="modal-fv">${fmt(v.distanceRun)}</div></div>
+    ${v.dayNotes ? `<div class="modal-full"><div class="modal-fl">Day Notes</div><div class="modal-fv">${escapeAttr(v.dayNotes)}</div></div>` : ""}
+  `;
+  const overlay = document.getElementById("voyageModal");
+  overlay.classList.remove("hidden");
+  overlay.querySelector(".modal-card").scrollTop = 0;
+}
+
+document.getElementById("voyageModalClose").addEventListener("click", ()=>{
+  document.getElementById("voyageModal").classList.add("hidden");
+});
+// Close modal when clicking the dark overlay (outside the card)
+document.getElementById("voyageModal").addEventListener("click", e=>{
+  if(e.target === document.getElementById("voyageModal")){
+    document.getElementById("voyageModal").classList.add("hidden");
   }
 });
 

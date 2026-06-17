@@ -91,6 +91,11 @@
   .btn-primary{background:var(--navy); color:#fff;}
   .btn-secondary{background:#eef1f4; color:var(--navy);}
   .btn-primary:active, .btn-secondary:active{opacity:.8;}
+  /* Area Fished multi-select */
+  .area-row{display:flex;gap:6px;align-items:center;margin-bottom:6px;}
+  .area-row select{flex:1;}
+  .remove-area-btn{padding:11px 14px;background:#fbdcd6;color:#a3341b;border:none;border-radius:8px;cursor:pointer;font-size:16px;flex-shrink:0;}
+  .btn-add-area{width:100%;margin-top:2px;padding:11px 10px;font-size:14px;font-weight:600;border:none;border-radius:8px;cursor:pointer;background:#eef1f4;color:var(--navy);}
   .toast{
     position:fixed; top:64px; left:50%; transform:translateX(-50%);
     background:#1a1a1a; color:#fff; padding:10px 18px; border-radius:8px;
@@ -207,8 +212,9 @@
         </div>
       </div>
 
-      <label for="areaFished">Area Fished</label>
-      <select id="areaFished"></select>
+      <label>Area Fished <span class="opt">(up to 5 areas)</span></label>
+      <div id="areaFishedContainer"></div>
+      <button type="button" id="addAreaBtn" class="btn-add-area">+ Add Another Area</button>
 
       <label for="guests">Guests <span class="opt">(head-count)</span></label>
       <input type="number" id="guests" min="0" step="1" inputmode="numeric">
@@ -363,7 +369,7 @@ const CONFIG = {
     boat: ["RAMPAGE","REEFRAIDER","TROPICAL STAR","HALCYON III"],
     captain: ["Captain Rama Rao","Captain B Arjun Kumar","Captain Dilip Ekka","Captain Krishna Rao","Captain TBD"],
     port: ["Port Blair","Hut Bay (Little Andaman)","Diglipur (North Andaman)","Havelock (Swaraj Dweep)","Neil Island (Shaheed Dweep)","Chiriya Tapu","Rangat","Mayabunder","Other"],
-    area: ["Rutland","Cinque Island","The Sisters","Passage","Wall","Nirupak Patch","South Sentinel","Invisible Bank","Incredible Bank","Barren Island","Neil Island","Off Diglipur","Landfall/ East Island","Other"],
+    area: ["Rutland","Cinque Island","The Sisters","Passage","Wall","Nirupak Patch","South Sentinel","Invisible Bank","Incredible Bank","Barren Island","Neil Island","Off Diglipur","Landfall/ East Island","Brothers","Other"],
     windDirection: ["N","NE","E","SE","S","SW","W","NW","Variable"],
     seaCondition: ["Calm / Glassy","Slight","Moderate","Rough","Very Rough"],
     skyWeather: ["Clear","Partly Cloudy","Cloudy","Overcast","Light Rain","Heavy Rain","Squall / Storm"]
@@ -400,10 +406,73 @@ function boatNames(){
   return CONFIG.DROPDOWNS.boat;
 }
 
+// ============================================================
+// Area Fished — multi-select (up to 5 values)
+// ============================================================
+function initAreaFished(values){
+  const container = document.getElementById("areaFishedContainer");
+  container.innerHTML = "";
+  const vals = (values && values.length) ? values : [""];
+  vals.forEach((val, i) => _addAreaRow(val, i === 0));
+  _updateAddAreaBtn();
+}
+
+function _addAreaRow(value, isFirst){
+  const container = document.getElementById("areaFishedContainer");
+  const div = document.createElement("div");
+  div.className = "area-row";
+
+  const sel = document.createElement("select");
+  sel.className = "area-select";
+  // placeholder
+  const ph = document.createElement("option");
+  ph.value = ""; ph.textContent = "Select area";
+  sel.appendChild(ph);
+  CONFIG.DROPDOWNS.area.forEach(a=>{
+    const opt = document.createElement("option");
+    opt.value = a; opt.textContent = a;
+    sel.appendChild(opt);
+  });
+  if(value) sel.value = value;
+  div.appendChild(sel);
+
+  // Every row except the first gets a remove button
+  if(!isFirst){
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "remove-area-btn";
+    btn.textContent = "✕";
+    btn.setAttribute("aria-label", "Remove this area");
+    btn.addEventListener("click", ()=>{ div.remove(); _updateAddAreaBtn(); });
+    div.appendChild(btn);
+  }
+
+  container.appendChild(div);
+  _updateAddAreaBtn();
+}
+
+function _updateAddAreaBtn(){
+  const count = document.querySelectorAll("#areaFishedContainer .area-row").length;
+  document.getElementById("addAreaBtn").style.display = count >= 5 ? "none" : "";
+}
+
+document.getElementById("addAreaBtn").addEventListener("click", ()=>{
+  _addAreaRow("", false);
+});
+
+function getAreaFishedValue(){
+  const values = [];
+  document.querySelectorAll("#areaFishedContainer .area-select").forEach(sel=>{
+    const v = sel.value.trim();
+    if(v && values.indexOf(v) === -1) values.push(v); // deduplicate
+  });
+  return values.join(", ");
+}
+
 fillSelect("boat", boatNames(), "Select boat");
 fillSelect("departurePort", CONFIG.DROPDOWNS.port, "Select port");
 fillSelect("arrivalPort", CONFIG.DROPDOWNS.port, "Select port");
-fillSelect("areaFished", CONFIG.DROPDOWNS.area, "Select area");
+initAreaFished();
 fillSelect("windDirection", CONFIG.DROPDOWNS.windDirection, "Select");
 fillSelect("seaCondition", CONFIG.DROPDOWNS.seaCondition, "Select");
 fillSelect("skyWeather", CONFIG.DROPDOWNS.skyWeather, "Select");
@@ -650,7 +719,7 @@ function buildEntry(){
       crew: v("crew"),
       departurePort: v("departurePort"),
       arrivalPort: v("arrivalPort"),
-      areaFished: v("areaFished"),
+      areaFished: getAreaFishedValue(),
       guests: num("guests"),
       windDirection: v("windDirection"),
       seaCondition: v("seaCondition"),
