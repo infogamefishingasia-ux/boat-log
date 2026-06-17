@@ -111,6 +111,10 @@
   .days-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
   @media(max-width:500px){.days-grid{grid-template-columns:1fr;}}
   .days-grid h3{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--navy);margin:0 0 8px;font-weight:700;}
+  /* Override global table min-width for the compact days tables */
+  #daysByBoatTable, #daysByCaptainTable{min-width:0;width:100%;}
+  #daysByBoatTable td:last-child, #daysByCaptainTable td:last-child,
+  #daysByBoatTable th:last-child, #daysByCaptainTable th:last-child{text-align:right;width:48px;}
   /* Voyage log filter */
   .filter-row{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
   .filter-row label{font-size:12px;font-weight:600;color:var(--muted);white-space:nowrap;margin:0;}
