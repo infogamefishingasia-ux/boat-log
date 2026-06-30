@@ -268,25 +268,37 @@
 
     <div class="card">
       <h2>Fuel</h2>
-      <div class="row2">
+      <div class="row3">
         <div>
-          <label for="fuelStart">Tank - Start (L) <span class="opt">(auto)</span></label>
+          <label for="fuelStart">Initial Tank - Start (L) <span class="opt">(auto)</span></label>
           <input type="number" id="fuelStart" step="0.1" inputmode="decimal" readonly>
         </div>
         <div>
           <label for="fuelFilled">Filled (L)</label>
           <input type="number" id="fuelFilled" step="0.1" inputmode="decimal" value="0">
         </div>
-      </div>
-      <div class="row2">
         <div>
-          <label for="fuelStop">Tank - Stop (L)</label>
-          <input type="number" id="fuelStop" step="0.1" inputmode="decimal">
+          <label for="inTankStart">In Tank - Start (L) <span class="opt">(auto)</span></label>
+          <input type="number" id="inTankStart" step="0.1" inputmode="decimal" readonly>
+        </div>
+      </div>
+      <div class="row3">
+        <div>
+          <label for="meterStart">Boat Meter - Start (L)</label>
+          <input type="number" id="meterStart" step="0.1" inputmode="decimal">
         </div>
         <div>
           <label for="fuelUsed">Used (L) <span class="opt">(auto)</span></label>
           <input type="number" id="fuelUsed" step="0.1" inputmode="decimal" readonly>
         </div>
+        <div>
+          <label for="inTankEnd">In Tank - End (L) <span class="opt">(auto)</span></label>
+          <input type="number" id="inTankEnd" step="0.1" inputmode="decimal" readonly>
+        </div>
+      </div>
+      <div>
+        <label for="meterStop">Boat Meter - Stop (L)</label>
+        <input type="number" id="meterStop" step="0.1" inputmode="decimal">
       </div>
       <div class="hint" id="fuelBalanceHint">Select a boat to load its current tank reading.</div>
 
@@ -640,7 +652,10 @@ function renderQueue(){
 }
 
 // ============================================================
-// Fuel auto-calc: Tank Start (from cached balance) + Filled - Stop = Used
+// Fuel auto-calc (new methodology):
+//   In Tank - Start  = Initial Tank Start + Filled
+//   Used (L)         = Boat Meter Stop - Boat Meter Start
+//   In Tank - End    = In Tank Start - Used
 // ============================================================
 function getBoatConfig(boat){
   const bs = loadBootstrap();
@@ -656,25 +671,32 @@ function refreshFuelStart(){
 }
 
 function updateFuelCalc(){
-  const num = id => {
+  const numVal = id => {
     const x = document.getElementById(id).value;
     return x === "" ? 0 : Number(x);
   };
-  const start = num("fuelStart");
-  const filled = num("fuelFilled");
-  const stop = num("fuelStop");
-  const used = start + filled - stop;
-  document.getElementById("fuelUsed").value = used.toFixed(1);
+  const initialStart = numVal("fuelStart");
+  const filled       = numVal("fuelFilled");
+  const meterStart   = numVal("meterStart");
+  const meterStop    = numVal("meterStop");
+
+  const inTankStart = initialStart + filled;
+  const fuelUsed    = Math.max(0, meterStop - meterStart);
+  const inTankEnd   = inTankStart - fuelUsed;
+
+  document.getElementById("inTankStart").value = inTankStart.toFixed(1);
+  document.getElementById("fuelUsed").value    = fuelUsed.toFixed(1);
+  document.getElementById("inTankEnd").value   = inTankEnd.toFixed(1);
 
   const boat = document.getElementById("boat").value;
   const cfg = getBoatConfig(boat);
   const hint = document.getElementById("fuelBalanceHint");
   if(cfg){
-    const stopVal = document.getElementById("fuelStop").value;
-    if(stopVal === ""){
+    const stopEntered = document.getElementById("meterStop").value;
+    if(stopEntered === ""){
       hint.textContent = "Tank capacity: " + cfg.tankCapacity + " L. Current balance: " + cfg.currentBalance + " L.";
     }else{
-      hint.textContent = "Balance after this entry: " + stop.toFixed(1) + " / " + cfg.tankCapacity + " L.";
+      hint.textContent = "Balance after this entry: " + inTankEnd.toFixed(1) + " / " + cfg.tankCapacity + " L.";
     }
   }else{
     hint.textContent = "Select a boat to load its current tank reading.";
@@ -683,7 +705,8 @@ function updateFuelCalc(){
 
 document.getElementById("boat").addEventListener("change", refreshFuelStart);
 document.getElementById("fuelFilled").addEventListener("input", updateFuelCalc);
-document.getElementById("fuelStop").addEventListener("input", updateFuelCalc);
+document.getElementById("meterStart").addEventListener("input", updateFuelCalc);
+document.getElementById("meterStop").addEventListener("input", updateFuelCalc);
 
 // Locally update the cached tank balance so the next entry (even offline)
 // prefills correctly. Server-side sync also updates the Config sheet.
@@ -731,8 +754,10 @@ function buildEntry(){
       engStbdStop: num("engStbdStop"),
       fuelStart: num("fuelStart"),
       fuelFilled: num("fuelFilled"),
-      fuelUsed: num("fuelUsed"),
-      fuelStop: num("fuelStop"),
+      meterStart: num("meterStart"),
+      meterStop: num("meterStop"),
+      fuelUsed: num("fuelUsed"),     // auto: meterStop - meterStart
+      inTankEnd: num("inTankEnd"),   // auto: inTankStart - fuelUsed (new Config balance)
       distanceRun: num("distanceRun"),
       dayNotes: v("dayNotes"),
       submittedBy: captain
@@ -758,9 +783,14 @@ function validateForm(){
       return false;
     }
   }
-  if(document.getElementById("fuelStop").value === ""){
-    showToast("Please enter Fuel Tank - Stop (L)");
-    document.getElementById("fuelStop").focus();
+  if(document.getElementById("meterStart").value === ""){
+    showToast("Please enter Boat Meter - Start (L)");
+    document.getElementById("meterStart").focus();
+    return false;
+  }
+  if(document.getElementById("meterStop").value === ""){
+    showToast("Please enter Boat Meter - Stop (L)");
+    document.getElementById("meterStop").focus();
     return false;
   }
   return true;
@@ -786,7 +816,7 @@ document.getElementById("saveBtn").addEventListener("click", ()=>{
   const q = loadQueue();
   q.push(entry);
   saveQueue(q);
-  updateLocalBalance(entry.voyage.boat, entry.voyage.fuelStop);
+  updateLocalBalance(entry.voyage.boat, entry.voyage.inTankEnd);
   renderQueue();
   resetForm();
   showToast("Saved on device. Will sync when online.");
