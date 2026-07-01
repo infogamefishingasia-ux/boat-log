@@ -800,6 +800,32 @@ function validateForm(){
     document.getElementById("meterStop").focus();
     return false;
   }
+  // Validate GT over 30kg / 120cm — reject any individual value below 30
+  const gtOver30Val = document.getElementById("gtOver30").value.trim();
+  if(gtOver30Val !== ""){
+    const badGT = gtOver30Val.split(",").filter(x => {
+      const n = Number(x.trim());
+      return x.trim() !== "" && (isNaN(n) || n < 30);
+    });
+    if(badGT.length > 0){
+      showToast("GT over 30kg: value(s) below 30 not allowed — " + badGT.join(", "));
+      document.getElementById("gtOver30").focus();
+      return false;
+    }
+  }
+  // Validate Dogtooth over 20kg — reject any individual value below 20
+  const dtOver20Val = document.getElementById("dogtoothOver20").value.trim();
+  if(dtOver20Val !== ""){
+    const badDT = dtOver20Val.split(",").filter(x => {
+      const n = Number(x.trim());
+      return x.trim() !== "" && (isNaN(n) || n < 20);
+    });
+    if(badDT.length > 0){
+      showToast("Dogtooth over 20kg: value(s) below 20 not allowed — " + badDT.join(", "));
+      document.getElementById("dogtoothOver20").focus();
+      return false;
+    }
+  }
   return true;
 }
 
