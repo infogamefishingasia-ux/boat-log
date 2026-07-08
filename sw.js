@@ -1,7 +1,7 @@
 // Aqua Creed Boat Log - Service Worker
 // Caches the app shell so the form loads with zero connectivity.
 // Bump CACHE_NAME whenever index.html/manifest/icons change to force an update.
-const CACHE_NAME = "boatlog-shell-v11";
+const CACHE_NAME = "boatlog-shell-v12";
 const SHELL_FILES = [
   "./",
   "./index.html",

@@ -133,6 +133,14 @@
   .login-card button{width:100%; margin-top:14px;}
   .login-hint{font-size:12px; color:var(--warn); margin-top:8px; min-height:16px;}
   #appScreen.hidden{display:none;}
+  /* Draft system */
+  .draft-banner{
+    background:#fff8e1; border:1px solid #ffc107; border-radius:10px;
+    padding:10px 14px; margin-bottom:12px; font-size:13px; color:#7a5c00; line-height:1.5;
+  }
+  .draft-banner.hidden{display:none;}
+  .btn-warn{background:#e76f51; color:#fff;}
+  .btn-warn:active{opacity:.8;}
 </style>
 </head>
 <body>
@@ -179,6 +187,9 @@
 </div>
 
 <main>
+  <div class="draft-banner hidden" id="draftBanner">
+    ✏️ <span id="draftBannerText"></span>
+  </div>
   <form id="logForm">
 
     <div class="card">
@@ -349,6 +360,7 @@
       <h2>Sync Queue</h2>
       <div id="queueSummary">No entries saved yet.</div>
       <div class="queue-list" id="queueList"></div>
+      <button type="button" class="btn-secondary" id="syncBtn" style="margin-top:10px;width:100%">Sync Now</button>
       <details style="margin-top:8px;">
         <summary>Apps Script connection</summary>
         <p class="hint">Endpoint is configured in this app's code (CONFIG.SYNC_URL). If syncing fails repeatedly, check the URL with your admin.</p>
@@ -365,8 +377,8 @@
 </main>
 
 <div class="actions">
-  <button type="button" class="btn-secondary" id="syncBtn">Sync Now</button>
-  <button type="button" class="btn-primary" id="saveBtn">Save Entry</button>
+  <button type="button" class="btn-secondary" id="morningBtn">Save Morning Data</button>
+  <button type="button" class="btn-primary" id="saveBtn">Save Voyage Entry</button>
 </div>
 
 </div><!-- /#appScreen -->
@@ -576,6 +588,10 @@ function showApp(){
   document.getElementById("loginScreen").classList.add("hidden");
   document.getElementById("appScreen").classList.remove("hidden");
   refreshFuelStart();
+  // Restore any saved draft for this captain
+  const draft = loadDraft();
+  if(draft) restoreDraft(draft);
+  updateDraftUI();
 }
 
 document.getElementById("loginBtn").addEventListener("click", async ()=>{
@@ -618,6 +634,151 @@ document.getElementById("loginBtn").addEventListener("click", async ()=>{
 document.getElementById("logoutBtn").addEventListener("click", ()=>{
   clearLoggedInCaptain();
   showLogin();
+});
+
+// ============================================================
+// Draft system — per-captain partial entry save
+// Captains save morning data (engine start, meter start) then
+// complete the entry in the evening before final Save Voyage Entry.
+// ============================================================
+const DRAFT_KEY_PREFIX = "boatlog_draft_";
+
+function getDraftKey(){
+  return DRAFT_KEY_PREFIX + getLoggedInCaptain();
+}
+function loadDraft(){
+  try{ return JSON.parse(localStorage.getItem(getDraftKey())) || null; }
+  catch(e){ return null; }
+}
+function clearDraft(){
+  localStorage.removeItem(getDraftKey());
+}
+
+function saveDraft(){
+  const captain = getLoggedInCaptain();
+  if(!captain) return;
+  const v = id => document.getElementById(id).value;
+  const areaFished = [];
+  document.querySelectorAll("#areaFishedContainer .area-select").forEach(sel=>{
+    if(sel.value) areaFished.push(sel.value);
+  });
+  const draft = {
+    captainName: captain,
+    date: v("date"),
+    boat: v("boat"),
+    savedAt: Date.now(),
+    fields: {
+      crew: v("crew"),
+      departurePort: v("departurePort"),
+      arrivalPort: v("arrivalPort"),
+      guests: v("guests"),
+      areaFished: areaFished,
+      windDirection: v("windDirection"),
+      seaCondition: v("seaCondition"),
+      skyWeather: v("skyWeather"),
+      engPortStart: v("engPortStart"),
+      engPortStop: v("engPortStop"),
+      engStbdStart: v("engStbdStart"),
+      engStbdStop: v("engStbdStop"),
+      fuelFilled: v("fuelFilled"),
+      meterStart: v("meterStart"),
+      meterStop: v("meterStop"),
+      distanceRun: v("distanceRun"),
+      gtCount: v("gtCount"),
+      dogtoothCount: v("dogtoothCount"),
+      otherFishCount: v("otherFishCount"),
+      gtOver30: v("gtOver30"),
+      gtLength: v("gtLength"),
+      dogtoothOver20: v("dogtoothOver20"),
+      catchNotes: v("catchNotes"),
+      dayNotes: v("dayNotes")
+    }
+  };
+  localStorage.setItem(getDraftKey(), JSON.stringify(draft));
+}
+
+function restoreDraft(draft){
+  if(!draft) return;
+  const setVal = (id, val) => {
+    if(val === undefined || val === null || val === "") return;
+    const el = document.getElementById(id);
+    if(el) el.value = val;
+  };
+  setVal("date", draft.date);
+  const boatEl = document.getElementById("boat");
+  if(boatEl && draft.boat){ boatEl.value = draft.boat; refreshFuelStart(); }
+  const f = draft.fields;
+  setVal("crew", f.crew);
+  setVal("departurePort", f.departurePort);
+  setVal("arrivalPort", f.arrivalPort);
+  setVal("guests", f.guests);
+  if(f.areaFished && f.areaFished.length > 0) initAreaFished(f.areaFished);
+  setVal("windDirection", f.windDirection);
+  setVal("seaCondition", f.seaCondition);
+  setVal("skyWeather", f.skyWeather);
+  setVal("engPortStart", f.engPortStart);
+  setVal("engPortStop", f.engPortStop);
+  setVal("engStbdStart", f.engStbdStart);
+  setVal("engStbdStop", f.engStbdStop);
+  setVal("fuelFilled", f.fuelFilled);
+  setVal("meterStart", f.meterStart);
+  setVal("meterStop", f.meterStop);
+  setVal("distanceRun", f.distanceRun);
+  setVal("gtCount", f.gtCount);
+  setVal("dogtoothCount", f.dogtoothCount);
+  setVal("otherFishCount", f.otherFishCount);
+  setVal("gtOver30", f.gtOver30);
+  setVal("gtLength", f.gtLength);
+  setVal("dogtoothOver20", f.dogtoothOver20);
+  setVal("catchNotes", f.catchNotes);
+  setVal("dayNotes", f.dayNotes);
+  updateFuelCalc();
+}
+
+function updateDraftUI(){
+  const draft = loadDraft();
+  const hasDraft = !!draft;
+  const morningBtn    = document.getElementById("morningBtn");
+  const draftBanner   = document.getElementById("draftBanner");
+  const draftTxt      = document.getElementById("draftBannerText");
+  const syncBtn       = document.getElementById("syncBtn");
+  const dateInput     = document.getElementById("date");
+  const boatSelect    = document.getElementById("boat");
+  if(!morningBtn || !draftBanner) return;
+
+  if(hasDraft){
+    draftBanner.classList.remove("hidden");
+    const t = new Date(draft.savedAt).toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"});
+    draftTxt.textContent = "Draft in progress: " + draft.date + " — " + draft.boat
+      + " (saved " + t + "). Complete your entry then press Save Voyage Entry.";
+    morningBtn.textContent = "Discard Draft";
+    morningBtn.className   = "btn-warn";
+    syncBtn.disabled       = true;
+    syncBtn.title          = "Complete or discard the current draft before syncing.";
+    dateInput.disabled     = true;
+    boatSelect.disabled    = true;
+  } else {
+    draftBanner.classList.add("hidden");
+    morningBtn.textContent = "Save Morning Data";
+    morningBtn.className   = "btn-secondary";
+    syncBtn.disabled       = false;
+    syncBtn.title          = "";
+    dateInput.disabled     = false;
+    boatSelect.disabled    = false;
+  }
+}
+
+document.getElementById("morningBtn").addEventListener("click", ()=>{
+  if(loadDraft()){
+    if(!confirm("Discard the current draft for this day? This cannot be undone.")) return;
+    clearDraft();
+    resetForm(); // resetForm calls updateDraftUI internally
+    showToast("Draft discarded.");
+  } else {
+    saveDraft();
+    updateDraftUI();
+    showToast("Morning data saved. Complete your entry this evening.", 4000);
+  }
 });
 
 // ============================================================
@@ -830,6 +991,9 @@ function validateForm(){
 }
 
 function resetForm(){
+  // Re-enable fields that may have been locked by the draft system
+  document.getElementById("date").disabled  = false;
+  document.getElementById("boat").disabled  = false;
   document.getElementById("logForm").reset();
   document.getElementById("date").valueAsDate = new Date();
   ["gtCount","dogtoothCount","otherFishCount"].forEach(id=>{
@@ -837,7 +1001,9 @@ function resetForm(){
   });
   document.getElementById("fuelFilled").value = 0;
   document.getElementById("captainDisplay").value = getLoggedInCaptain();
+  initAreaFished();   // reset area fished back to one empty row
   refreshFuelStart();
+  updateDraftUI();    // refresh banner / button state
 }
 
 // ============================================================
@@ -850,8 +1016,9 @@ document.getElementById("saveBtn").addEventListener("click", ()=>{
   q.push(entry);
   saveQueue(q);
   updateLocalBalance(entry.voyage.boat, entry.voyage.inTankEnd);
+  clearDraft();   // draft complete — remove it so Sync Now unlocks
   renderQueue();
-  resetForm();
+  resetForm();    // also calls updateDraftUI
   showToast("Saved on device. Will sync when online.");
   if(navigator.onLine) syncQueue();
 });
@@ -860,6 +1027,10 @@ document.getElementById("saveBtn").addEventListener("click", ()=>{
 // Sync queue to Apps Script
 // ============================================================
 async function syncQueue(){
+  if(loadDraft()){
+    showToast("Complete or discard your draft before syncing.");
+    return;
+  }
   if(CONFIG.SYNC_URL.indexOf("PASTE_YOUR") === 0){
     showToast("Sync endpoint not configured yet.");
     return;
