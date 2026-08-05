@@ -293,11 +293,27 @@
           <input type="number" id="inTankStart" step="0.1" inputmode="decimal" readonly>
         </div>
       </div>
-      <div class="row3">
+      <div class="row2">
         <div>
-          <label for="meterStart">Boat Meter - Start (L)</label>
-          <input type="number" id="meterStart" step="0.1" inputmode="decimal">
+          <label for="meterStart1">Boat Meter 1 - Start (L)</label>
+          <input type="number" id="meterStart1" step="0.1" inputmode="decimal">
         </div>
+        <div>
+          <label for="meterStart2">Boat Meter 2 - Start (L) <span class="opt">(optional)</span></label>
+          <input type="number" id="meterStart2" step="0.1" inputmode="decimal">
+        </div>
+      </div>
+      <div class="row2">
+        <div>
+          <label for="meterStop1">Boat Meter 1 - Stop (L)</label>
+          <input type="number" id="meterStop1" step="0.1" inputmode="decimal">
+        </div>
+        <div>
+          <label for="meterStop2">Boat Meter 2 - Stop (L) <span class="opt">(optional)</span></label>
+          <input type="number" id="meterStop2" step="0.1" inputmode="decimal">
+        </div>
+      </div>
+      <div class="row2">
         <div>
           <label for="fuelUsed">Used (L) <span class="opt">(auto)</span></label>
           <input type="number" id="fuelUsed" step="0.1" inputmode="decimal" readonly>
@@ -306,14 +322,6 @@
           <label for="inTankEnd">In Tank - End (L) <span class="opt">(auto)</span></label>
           <input type="number" id="inTankEnd" step="0.1" inputmode="decimal" readonly>
         </div>
-      </div>
-      <div class="row3">
-        <div>
-          <label for="meterStop">Boat Meter - Stop (L)</label>
-          <input type="number" id="meterStop" step="0.1" inputmode="decimal">
-        </div>
-        <div></div>
-        <div></div>
       </div>
       <div class="hint" id="fuelBalanceHint">Select a boat to load its current tank reading.</div>
 
@@ -681,8 +689,10 @@ function saveDraft(){
       engStbdStart: v("engStbdStart"),
       engStbdStop: v("engStbdStop"),
       fuelFilled: v("fuelFilled"),
-      meterStart: v("meterStart"),
-      meterStop: v("meterStop"),
+      meterStart1: v("meterStart1"),
+      meterStart2: v("meterStart2"),
+      meterStop1: v("meterStop1"),
+      meterStop2: v("meterStop2"),
       distanceRun: v("distanceRun"),
       gtCount: v("gtCount"),
       dogtoothCount: v("dogtoothCount"),
@@ -721,8 +731,10 @@ function restoreDraft(draft){
   setVal("engStbdStart", f.engStbdStart);
   setVal("engStbdStop", f.engStbdStop);
   setVal("fuelFilled", f.fuelFilled);
-  setVal("meterStart", f.meterStart);
-  setVal("meterStop", f.meterStop);
+  setVal("meterStart1", f.meterStart1);
+  setVal("meterStart2", f.meterStart2);
+  setVal("meterStop1", f.meterStop1);
+  setVal("meterStop2", f.meterStop2);
   setVal("distanceRun", f.distanceRun);
   setVal("gtCount", f.gtCount);
   setVal("dogtoothCount", f.dogtoothCount);
@@ -842,15 +854,32 @@ function updateFuelCalc(){
   };
   const initialStart = numVal("fuelStart");
   const filled       = numVal("fuelFilled");
-  const meterStart   = numVal("meterStart");
-  const meterStop    = numVal("meterStop");
+
+  // Meter 2 is optional — only compute used2 when BOTH its fields are filled
+  const m1StartVal = document.getElementById("meterStart1").value;
+  const m1StopVal  = document.getElementById("meterStop1").value;
+  const m2StartVal = document.getElementById("meterStart2").value;
+  const m2StopVal  = document.getElementById("meterStop2").value;
+
+  const meterStart1 = m1StartVal === "" ? 0 : Number(m1StartVal);
+  const meterStop1  = m1StopVal  === "" ? 0 : Number(m1StopVal);
+  const meterStart2 = m2StartVal === "" ? 0 : Number(m2StartVal);
+  const meterStop2  = m2StopVal  === "" ? 0 : Number(m2StopVal);
 
   const inTankStart = initialStart + filled;
-  // Handle meter rollover: if Stop < Start the meter passed 999.9 and reset to 0
-  const fuelUsed    = meterStop >= meterStart
-                        ? meterStop - meterStart
-                        : (1000 - meterStart) + meterStop;
-  const inTankEnd   = inTankStart - fuelUsed;
+  // Per-engine rollover: meter resets to 0 after 999.9
+  const used1 = meterStop1 >= meterStart1
+                  ? meterStop1 - meterStart1
+                  : (1000 - meterStart1) + meterStop1;
+  // Meter 2: only add if both readings are entered (avoids wrong mid-entry values)
+  let used2 = 0;
+  if(m2StartVal !== "" && m2StopVal !== ""){
+    used2 = meterStop2 >= meterStart2
+              ? meterStop2 - meterStart2
+              : (1000 - meterStart2) + meterStop2;
+  }
+  const fuelUsed  = used1 + used2;
+  const inTankEnd = inTankStart - fuelUsed;
 
   document.getElementById("inTankStart").value = inTankStart.toFixed(1);
   document.getElementById("fuelUsed").value    = fuelUsed.toFixed(1);
@@ -860,7 +889,7 @@ function updateFuelCalc(){
   const cfg = getBoatConfig(boat);
   const hint = document.getElementById("fuelBalanceHint");
   if(cfg){
-    const stopEntered = document.getElementById("meterStop").value;
+    const stopEntered = document.getElementById("meterStop1").value;
     if(stopEntered === ""){
       hint.textContent = "Tank capacity: " + cfg.tankCapacity + " L. Current balance: " + cfg.currentBalance + " L.";
     }else{
@@ -873,8 +902,10 @@ function updateFuelCalc(){
 
 document.getElementById("boat").addEventListener("change", refreshFuelStart);
 document.getElementById("fuelFilled").addEventListener("input", updateFuelCalc);
-document.getElementById("meterStart").addEventListener("input", updateFuelCalc);
-document.getElementById("meterStop").addEventListener("input", updateFuelCalc);
+document.getElementById("meterStart1").addEventListener("input", updateFuelCalc);
+document.getElementById("meterStart2").addEventListener("input", updateFuelCalc);
+document.getElementById("meterStop1").addEventListener("input", updateFuelCalc);
+document.getElementById("meterStop2").addEventListener("input", updateFuelCalc);
 
 // Locally update the cached tank balance so the next entry (even offline)
 // prefills correctly. Server-side sync also updates the Config sheet.
@@ -922,9 +953,11 @@ function buildEntry(){
       engStbdStop: num("engStbdStop"),
       fuelStart: num("fuelStart"),
       fuelFilled: num("fuelFilled"),
-      meterStart: num("meterStart"),
-      meterStop: num("meterStop"),
-      fuelUsed: num("fuelUsed"),     // auto: meterStop - meterStart
+      meterStart1: num("meterStart1"),
+      meterStart2: num("meterStart2"),
+      meterStop1: num("meterStop1"),
+      meterStop2: num("meterStop2"),
+      fuelUsed: num("fuelUsed"),     // auto: (stop1-start1) + (stop2-start2)
       inTankEnd: num("inTankEnd"),   // auto: inTankStart - fuelUsed (new Config balance)
       distanceRun: num("distanceRun"),
       dayNotes: v("dayNotes"),
@@ -951,14 +984,22 @@ function validateForm(){
       return false;
     }
   }
-  if(document.getElementById("meterStart").value === ""){
-    showToast("Please enter Boat Meter - Start (L)");
-    document.getElementById("meterStart").focus();
+  if(document.getElementById("meterStart1").value === ""){
+    showToast("Please enter Boat Meter 1 - Start (L)");
+    document.getElementById("meterStart1").focus();
     return false;
   }
-  if(document.getElementById("meterStop").value === ""){
-    showToast("Please enter Boat Meter - Stop (L)");
-    document.getElementById("meterStop").focus();
+  if(document.getElementById("meterStop1").value === ""){
+    showToast("Please enter Boat Meter 1 - Stop (L)");
+    document.getElementById("meterStop1").focus();
+    return false;
+  }
+  // Meter 2 is optional — but if one reading is filled, both must be filled
+  const _m2Start = document.getElementById("meterStart2").value;
+  const _m2Stop  = document.getElementById("meterStop2").value;
+  if((_m2Start === "") !== (_m2Stop === "")){
+    showToast("Boat Meter 2: enter both Start and Stop, or leave both blank.");
+    document.getElementById(_m2Start === "" ? "meterStart2" : "meterStop2").focus();
     return false;
   }
   // Validate GT over 30kg / 120cm — reject any individual value below 30
