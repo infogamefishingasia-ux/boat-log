@@ -1050,8 +1050,12 @@ function resetForm(){
 // ============================================================
 // Save entry
 // ============================================================
+let _saveLocked = false;
 document.getElementById("saveBtn").addEventListener("click", ()=>{
+  if(_saveLocked) return;               // ignore double-taps
   if(!validateForm()) return;
+  _saveLocked = true;
+  setTimeout(()=>{ _saveLocked = false; }, 2500);
   const entry = buildEntry();
   const q = loadQueue();
   q.push(entry);
@@ -1067,7 +1071,9 @@ document.getElementById("saveBtn").addEventListener("click", ()=>{
 // ============================================================
 // Sync queue to Apps Script
 // ============================================================
+let _syncing = false;   // only one sync run at a time (prevents duplicate uploads)
 async function syncQueue(){
+  if(_syncing) return;
   if(loadDraft()){
     showToast("Complete or discard your draft before syncing.");
     return;
@@ -1076,34 +1082,49 @@ async function syncQueue(){
     showToast("Sync endpoint not configured yet.");
     return;
   }
-  const q = loadQueue();
-  const pending = q.filter(e=>e.status==="pending" || e.status==="error");
-  if(pending.length === 0){
+  const isPending = e => e.status==="pending" || e.status==="error";
+  if(loadQueue().filter(isPending).length === 0){
     showToast("Nothing to sync.");
     return;
   }
-  showToast("Syncing " + pending.length + " entr" + (pending.length===1?"y":"ies") + "...");
-
-  for(const entry of pending){
-    try{
-      const res = await fetch(CONFIG.SYNC_URL, {
-        method: "POST",
-        headers: { "Content-Type": "text/plain;charset=utf-8" }, // avoids CORS preflight on Apps Script
-        body: JSON.stringify(entry)
-      });
-      const text = await res.text();
-      let ok = false;
-      try{ ok = JSON.parse(text).status === "ok"; } catch(e){ ok = text.indexOf("ok") !== -1; }
-      entry.status = ok ? "synced" : "error";
-    }catch(err){
-      entry.status = "error"; // stays in queue, retried later
+  _syncing = true;
+  const attempted = {};   // each entry is tried at most once per run (no endless retry loop)
+  let total = 0;
+  try{
+    // Loop so entries saved while this run is in progress are sent in the same run
+    while(true){
+      const todo = loadQueue().filter(e => isPending(e) && !attempted[e.entryId]).map(e=>e.entryId);
+      if(todo.length === 0) break;
+      if(total === 0) showToast("Syncing " + todo.length + " entr" + (todo.length===1?"y":"ies") + "...");
+      for(const id of todo){
+        attempted[id] = true; total++;
+        const current = loadQueue().find(e=>e.entryId===id);
+        if(!current || current.status==="synced") continue;
+        let ok = false;
+        try{
+          const res = await fetch(CONFIG.SYNC_URL, {
+            method: "POST",
+            headers: { "Content-Type": "text/plain;charset=utf-8" }, // avoids CORS preflight on Apps Script
+            body: JSON.stringify(current)
+          });
+          const text = await res.text();
+          try{ ok = JSON.parse(text).status === "ok"; } catch(e){ ok = text.indexOf("ok") !== -1; }
+        }catch(err){
+          ok = false; // stays in queue, retried later (server ignores repeats by entryId)
+        }
+        // Re-read the queue so entries saved during the upload are never overwritten
+        const q2 = loadQueue();
+        const target = q2.find(e=>e.entryId===id);
+        if(target){ target.status = ok ? "synced" : "error"; saveQueue(q2); }
+      }
     }
+    renderQueue();
+    const stillPending = loadQueue().filter(e=>e.status!=="synced").length;
+    showToast(stillPending===0 ? "All entries synced." : stillPending + " entr" + (stillPending===1?"y":"ies") + " still pending.");
+    refreshBootstrap();
+  } finally {
+    _syncing = false;
   }
-  saveQueue(q);
-  renderQueue();
-  const stillPending = loadQueue().filter(e=>e.status!=="synced").length;
-  showToast(stillPending===0 ? "All entries synced." : stillPending + " entr" + (stillPending===1?"y":"ies") + " still pending.");
-  refreshBootstrap();
 }
 
 document.getElementById("syncBtn").addEventListener("click", syncQueue);
